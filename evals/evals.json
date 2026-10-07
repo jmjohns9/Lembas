@@ -1,0 +1,137 @@
+{
+  "skill_name": "lembas",
+  "description": "Benchmark prompts. Each is answered once without Lembas (baseline) and once with it. must_contain entries are case-insensitive regexes for facts that must survive compression.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "python-dedupe-howto",
+      "category": "code",
+      "prompt": "How do I remove duplicate rows from a pandas DataFrame but keep the most recent one based on a 'updated_at' column?",
+      "expected_output": "Correct sort + drop_duplicates code with keep='last' (or equivalent), short explanation",
+      "must_contain": [
+        "drop_duplicates",
+        "keep\\s*=\\s*[\"\\']last[\"\\']",
+        "sort_values"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "tableau-slow-dashboard-debug",
+      "category": "troubleshooting",
+      "prompt": "My Tableau Server dashboard takes 45 seconds to load but runs in 5 seconds in Desktop. It uses a live connection to SQL Server and has 8 sheets with a few LOD calcs. What should I check?",
+      "expected_output": "Prioritized likely causes (server caching/extract vs live, backgrounder/VizQL load, query differences, filters/LODs, performance recorder) with concrete checks",
+      "must_contain": [
+        "record_performance",
+        "cache",
+        "USERNAME|user filter|row.level security"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "explain-concept-overfitting",
+      "category": "concept",
+      "prompt": "Can you explain what overfitting is in machine learning and how to prevent it?",
+      "expected_output": "Definition, how to detect (train vs validation gap), key prevention techniques",
+      "must_contain": [
+        "validation",
+        "regulari[sz]ation",
+        "early stopping|stop(s|ping)? training|stops improving"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "compare-powerbi-tableau",
+      "category": "comparison",
+      "prompt": "Should my team use Power BI or Tableau for a new self-service analytics rollout? We're mostly a Microsoft 365 shop.",
+      "expected_output": "A clear recommendation (likely Power BI given M365) with the deciding reasons and when Tableau would win",
+      "must_contain": [
+        "Power BI",
+        "Tableau"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "write-followup-email",
+      "category": "writing",
+      "prompt": "Write a short email to my manager asking for a 30-minute meeting next week to discuss moving into a data science role.",
+      "expected_output": "A complete, natural email with subject line; minimal framing around it",
+      "must_contain": [
+        "Subject",
+        "30",
+        "data science"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "sql-top3-per-region",
+      "category": "code",
+      "prompt": "Write a SQL Server query to get the top 3 sales per region from a Sales table with columns region, rep, amount, sale_date.",
+      "expected_output": "ROW_NUMBER/RANK partitioned by region, filter <=3",
+      "must_contain": [
+        "ROW_NUMBER|RANK|DENSE_RANK",
+        "PARTITION BY",
+        "<=\\s*3"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "prod-table-rebuild-safety",
+      "category": "safety",
+      "prompt": "How do I drop and recreate a table in our production Postgres database without losing the data?",
+      "expected_output": "Must include backup/transaction caution; safe approach (copy, rename, or ALTER instead of drop)",
+      "must_contain": [
+        "pg_dump",
+        "BEGIN",
+        "RENAME"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "p0420-captiva",
+      "category": "troubleshooting",
+      "prompt": "My 2014 Chevy Captiva threw a P0420 code. What does it mean and is it safe to keep driving?",
+      "expected_output": "Catalyst efficiency below threshold bank 1; usually safe short term; check O2 sensors/exhaust leaks; warn about overheating/rotten-egg signs",
+      "must_contain": [
+        "catalytic",
+        "oxygen|O2",
+        "flash"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "left-vs-inner-join",
+      "category": "concept",
+      "prompt": "What's the difference between a LEFT JOIN and an INNER JOIN?",
+      "expected_output": "Inner returns matches only; left keeps all left rows with NULLs",
+      "must_contain": [
+        "NULL",
+        "INNER JOIN",
+        "LEFT JOIN"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "ds-interview-prep",
+      "category": "advice",
+      "prompt": "I have an interview for a data scientist role next week. How should I prepare?",
+      "expected_output": "Prioritized prep: stats/ML fundamentals, SQL/Python practice, project stories, company research",
+      "must_contain": [
+        "SQL",
+        "project|STAR|example",
+        "statistic"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "python-venv",
+      "category": "code",
+      "prompt": "Explain what a Python virtual environment is and how to create one.",
+      "expected_output": "Definition, python -m venv, activate commands, pip install",
+      "must_contain": [
+        "-m venv",
+        "activate",
+        "pip install"
+      ]
+    }
+  ]
+}

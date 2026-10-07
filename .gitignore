@@ -1,0 +1,18 @@
+# Build output (attach dist/lembas.skill to a GitHub release instead)
+dist/
+*.skill
+
+# Scratch benchmark runs (keep finished results in evals/results/<version>/)
+*-workspace/
+evals/scratch/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

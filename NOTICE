@@ -1,0 +1,11 @@
+Lembas
+Copyright 2026 Joshua M. Johnson
+
+This product includes ideas adapted from caveman
+(https://github.com/JuliusBrussee/caveman), Copyright 2026 Julius Brussee,
+licensed under the Apache License, Version 2.0.
+
+Lembas is an independent rewrite. The rule text in skills/lembas/SKILL.md was
+written fresh. Concepts adapted from caveman include answering first, keeping
+code and commands verbatim, staying on until switched off, relaxing for safety
+and irreversible actions, and a pre-send checklist.
