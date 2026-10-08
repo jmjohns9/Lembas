@@ -1,0 +1,22 @@
+{
+ "Q0": {"X": {"errors": [], "missing": ["Alternatives without memo: move state down / pass child as children", "Profile before optimizing (re-renders usually cheap)"], "readable": "yes", "verdict": "minor gap"},
+        "Y": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete", "notes": "Terse telegraphic style but readable; 'React Compiler (React 19+)' slightly imprecise since it also supports 17/18"}},
+ "Q1": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": ["Connection leaks / always return connection (finally, with)", "Oversized pool slows the DB", "Session state carryover and transaction-mode proxy caveats"], "readable": "yes", "verdict": "minor gap"}},
+ "Q2": {"X": {"errors": [], "missing": ["TCP is a byte stream with no message boundaries vs UDP message-based datagrams"], "readable": "yes", "verdict": "minor gap"},
+        "Y": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"}},
+ "Q3": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": ["Native leak case (rss/external grows, heap flat; snapshots won't show it)", "Other common causes: unsettled promises, unconsumed streams, unreleased sockets/connections", "Verify fix under load; restarts are only a stopgap"], "readable": "yes", "verdict": "minor gap"}},
+ "Q4": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": ["Which index is used / filter placement", "Other red flags: sorts/hashes spilling to disk, nested loops over many rows; run ANALYZE to refresh stats"], "readable": "yes", "verdict": "minor gap"}},
+ "Q5": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": ["Worst case O(n) when keys collide heavily", "Linear probing clustering trade-off"], "readable": "yes", "verdict": "minor gap"}},
+ "Q6": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete", "notes": "Telegraphic but readable"}},
+ "Q7": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": ["Bullet heading 'No stale results' and 'can't arrive' overstate the guarantee; the same bullet then says it can still happen (self-contradictory)"], "missing": [], "readable": "yes", "verdict": "minor gap"}},
+ "Q8": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"}},
+ "Q9": {"X": {"errors": [], "missing": [], "readable": "yes", "verdict": "complete"},
+        "Y": {"errors": [], "missing": ["Replay/retention: log-based topics vs queues deleting on consume", "Offline subscribers can miss messages on plain topics (durable subscriptions / queue per subscriber)"], "readable": "yes", "verdict": "minor gap"}}
+}

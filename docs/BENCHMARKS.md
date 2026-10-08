@@ -54,6 +54,40 @@ Two things stand out:
 - **v0.2 looked like it passed 60% but didn't generalize.** It cut 64% on the 5 prompts it was tuned on, then only 59% once 6 new prompts were added. Testing on prompts the skill wasn't tuned on matters.
 - **Rewording rules stopped paying off; word budgets didn't.** v0.3's extra rules gained about one point, which is within noise. Giving the model a concrete number of words to aim for gained seven.
 
+## Caveman skill benchmark
+
+Lembas was also run on caveman's own skill benchmark: 10 developer questions on `claude-opus-5-5`, scored as the cut **beyond a plain `Answer concisely.` instruction**, which is stricter than the comparison above. Method and raw data are in [evals/caveman-bench](../evals/caveman-bench).
+
+### Token savings beyond "Answer concisely." (median per question)
+
+| Arm | Run 1 | Run 2 | Run 3 | Run 4 |
+|---|---:|---:|---:|---:|
+| **Lembas 1.1.0** | | | **49%** | **52%** |
+| Lembas 1.0.0 | 54% | 55% | 52% | 53% |
+| ultracave | 34% | 41% | 29% | 45% |
+| megacave | 7% | 18% | | |
+| caveman | 5% | 12% | | |
+
+Real billed output tokens on 3 of the questions, against the control: Lembas 1.0.0 cut 60% (run 1) and 58% (run 3); Lembas 1.1.0 cut 58% (run 3); megacave 27% and ultracave 19% (run 1).
+
+Megacave answers in Classical Chinese. Caveman's scorer uses OpenAI's tokenizer, which makes that look cheap; counted with Claude's tokenizer and Claude's billing, it saves little.
+
+### Fidelity (blind review)
+
+A separate reviewer compared each anonymous answer with the full control answer. No version had a major gap.
+
+| Arm | Complete | Minor gap | Errors found |
+|---|---:|---:|---:|
+| Lembas 1.0.0, run 1 | 2 of 10 | 8 | 1 |
+| Lembas 1.0.0, runs 3 and 4 | 9 of 20 | 11 | 5 |
+| **Lembas 1.1.0, runs 3 and 4** | **12 of 20** | **8** | **2** |
+| ultracave, run 1 | 10 of 10 | 0 | 0 |
+| ultracave, runs 3 and 4 | 16 of 20 | 4 | 5 |
+
+v1.0.0 most often dropped the one gotcha a developer would trip on, such as returning connections to a pool or worst-case O(n) hash lookups. v1.1.0 keeps the main gotcha, which raised completeness and cut errors for about 2 points of savings. Ultracave is still more complete, at roughly half the savings.
+
+The reviewers disagreed with each other a lot: the run 3 reviewer passed 3 of 10 Lembas 1.1.0 answers and the run 4 reviewer passed 9 of 10. Treat the fidelity numbers as directional.
+
 ## Noise
 
 v0.4 was run twice on the same 11 prompts. The totals were 67.2% and 65.6%. One prompt (tableau-slow-dashboard-debug) swung from 80.9% to 70.5%. Treat any total difference under about 3 points as noise unless it holds across repeated runs.

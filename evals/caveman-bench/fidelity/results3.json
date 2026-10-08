@@ -1,0 +1,52 @@
+{
+"Q0": {
+ "A": {"errors": [], "missing": ["JSX children defeat memo", "child's own state/hooks and key changes also cause renders", "profile before optimizing (DevTools 'why did this render')"], "verdict": "minor gap"},
+ "B": {"errors": ["'compares props by reference' is imprecise; it is a shallow per-prop Object.is comparison"], "missing": ["JSX children defeat memo", "child's own state/hooks and key changes also cause renders", "profile before optimizing"], "verdict": "minor gap"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q1": {
+ "A": {"errors": ["implies max size alone keeps you under the DB limit, ignoring multiplication by app instances"], "missing": ["total = pool size x instances must stay under max_connections", "too-large pool overloads DB", "use try/finally/with to avoid leaks"], "verdict": "minor gap"},
+ "B": {"errors": ["calls pgBouncer a library alongside HikariCP/SQLAlchemy; it is an external proxy"], "missing": ["max lifetime/health checks for stale connections"], "verdict": "minor gap"},
+ "C": {"errors": ["overstates that Lambda cannot keep a local pool between invocations; warm containers can reuse connections"], "missing": [], "verdict": "minor gap"}
+},
+"Q2": {
+ "A": {"errors": ["'gives you the advantages of both' overstates QUIC"], "missing": ["TCP is a byte stream without message boundaries; UDP preserves datagram boundaries"], "verdict": "minor gap"},
+ "B": {"errors": [], "missing": [], "verdict": "complete"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q3": {
+ "A": {"errors": [], "missing": [], "verdict": "complete"},
+ "B": {"errors": [], "missing": ["rss growing with flat heap indicates native/Buffer leak"], "verdict": "minor gap"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q4": {
+ "A": {"errors": [], "missing": ["which index was chosen", "estimated vs actual rows gap means stale statistics; run ANALYZE"], "verdict": "minor gap"},
+ "B": {"errors": [], "missing": [], "verdict": "complete"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q5": {
+ "A": {"errors": [], "missing": ["average O(1) vs worst-case O(n) and role of a good hash function"], "verdict": "minor gap"},
+ "B": {"errors": ["treeify at 8 entries omits the minimum table capacity (64) condition; slight oversimplification"], "missing": [], "verdict": "complete"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q6": {
+ "A": {"errors": [], "missing": ["browser enforces it, so curl/Postman works", "mode: 'no-cors' does not fix it", "third-party API: route through your backend"], "verdict": "minor gap"},
+ "B": {"errors": [], "missing": ["mode: 'no-cors' does not fix it", "third-party API: route through your backend"], "verdict": "minor gap"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q7": {
+ "A": {"errors": [], "missing": [], "verdict": "complete"},
+ "B": {"errors": ["recreating the debounced function each render does not 'reset the timer'; each render gets a fresh timer so earlier calls all fire"], "missing": ["trade-off: added delay before results"], "verdict": "minor gap"},
+ "C": {"errors": ["'No stale results' heading overstates; debounce only reduces the race, it does not eliminate it"], "missing": [], "verdict": "minor gap"}
+},
+"Q8": {
+ "A": {"errors": [], "missing": ["rebasing already-pushed commits requires force-push", "conflicts may arise per replayed commit"], "verdict": "minor gap"},
+ "B": {"errors": [], "missing": [], "verdict": "complete"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+},
+"Q9": {
+ "A": {"errors": [], "missing": [], "verdict": "complete"},
+ "B": {"errors": [], "missing": [], "verdict": "complete"},
+ "C": {"errors": [], "missing": [], "verdict": "complete"}
+}
+}

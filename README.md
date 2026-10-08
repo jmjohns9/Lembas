@@ -12,7 +12,7 @@ Most of a typical AI reply isn't the answer. It's setup, a restated question, he
 | Reduction | | **67.7%** |
 | Key facts kept | 65 of 65 checks | 65 of 65 checks |
 
-See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the method and per-prompt results.
+Measured on v1.0.0. On [caveman's own skill benchmark](evals/caveman-bench), v1.1.0 cuts a further 49% to 52% beyond a plain "Answer concisely." instruction (58% in Claude's billed tokens), against 29% to 45% for caveman's ultracave mode. Ultracave keeps more detail, though: in a blind review it was complete on 16 of 20 answers to Lembas's 12. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for methods and full results.
 
 ## Example
 
@@ -44,6 +44,7 @@ cp -r lembas/skills/lembas ~/.claude/skills/
 - **Answers in the first sentence.** The verdict or fix comes first.
 - **Cuts ceremony.** No greetings, praise, restated questions, recaps or "hope this helps".
 - **Picks instead of surveying.** The three or four most likely causes, not every possible one. One example, not three.
+- **Keeps the gotcha.** The one mistake people most often hit on a topic always stays in.
 - **Sets word budgets.** 60 words for a quick fact, 120 for an explanation, 150 for how-to or advice. Code doesn't count.
 - **Keeps the payload exact.** Code, commands, paths, numbers and error messages are never shortened.
 - **Writes in plain language.** Full sentences and normal grammar. No fragments, invented abbreviations or caveman voice.
@@ -60,6 +61,7 @@ In testing, a question about rebuilding a production Postgres table came back at
 skills/lembas/SKILL.md      The skill itself
 evals/evals.json            11 benchmark prompts and the facts each reply must keep
 evals/results/v1.0.0/       Baseline and Lembas replies for each prompt
+evals/caveman-bench/        Results on caveman's skill benchmark
 scripts/count_tokens.py     Measures the reduction
 scripts/grade.py            Checks facts kept and filler removed
 scripts/package.sh          Builds dist/lembas.skill
