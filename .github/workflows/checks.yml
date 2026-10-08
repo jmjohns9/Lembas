@@ -1,0 +1,36 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Skill file has name and description
+        run: |
+          head -1 skills/lembas/SKILL.md | grep -qx -- '---'
+          grep -q '^name: lembas$' skills/lembas/SKILL.md
+          grep -q '^description:' skills/lembas/SKILL.md
+
+      - name: Reply length
+        run: python3 scripts/count_tokens.py evals/results/v1.0.0
+
+      - name: Facts kept and filler removed
+        run: python3 scripts/grade.py evals/evals.json evals/results/v1.0.0
+
+      - name: Package builds
+        run: |
+          bash scripts/package.sh
+          unzip -l dist/lembas.skill | grep -q 'lembas/SKILL.md'

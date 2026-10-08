@@ -1,5 +1,9 @@
 # Lembas
 
+[![Checks](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml/badge.svg)](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml)
+[![Release](https://img.shields.io/github/v/release/jmjohns9/lembas)](https://github.com/jmjohns9/lembas/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 **A Claude skill that cuts reply length by about two thirds without losing facts.**
 
 In *The Lord of the Rings*, one small bite of elven bread called lembas fills a traveler for a whole day. Lembas replies work the same way: small, complete, nothing extra to carry.
@@ -22,12 +26,12 @@ Without Lembas the reply is about 1,130 tokens: a six-part checklist with header
 
 ## Install
 
-**Claude apps (claude.ai, desktop, Cowork):** download `lembas.skill` from the latest release, open it in Claude and click **Save skill**. To build it yourself, run `scripts/package.sh` and use `dist/lembas.skill`.
+**Claude apps (claude.ai, desktop, Cowork):** download [`lembas.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/lembas.skill) from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), open it in Claude and click **Save skill**. To build it yourself, run `scripts/package.sh` and use `dist/lembas.skill`.
 
 **Claude Code:** copy the skill folder into your skills directory.
 
 ```bash
-git clone https://github.com/<your-account>/lembas.git
+git clone https://github.com/jmjohns9/lembas.git
 cp -r lembas/skills/lembas ~/.claude/skills/
 ```
 
@@ -67,7 +71,12 @@ scripts/grade.py            Checks facts kept and filler removed
 scripts/package.sh          Builds dist/lembas.skill
 docs/BENCHMARKS.md          Method, results and version history
 docs/DESIGN.md              Why each rule exists
+.github/workflows/checks.yml  Reruns the fact checks on every push
 ```
+
+## Contributing
+
+Found a reply that left out something important? [Open an issue](https://github.com/jmjohns9/lembas/issues/new/choose) with the prompt and the reply. Rule changes need benchmark numbers; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to run them. Safety problems go through [SECURITY.md](SECURITY.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Credits
 

@@ -64,5 +64,5 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
-[1.1.0]: https://github.com/<your-account>/lembas/releases/tag/v1.1.0
-[1.0.0]: https://github.com/<your-account>/lembas/releases/tag/v1.0.0
+[1.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.1.0
+[1.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.0.0

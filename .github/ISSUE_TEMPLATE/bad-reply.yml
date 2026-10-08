@@ -1,0 +1,45 @@
+name: Bad reply
+description: Lembas dropped something important, got something wrong, or was still too long.
+labels: ["reply-quality"]
+body:
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What went wrong?
+      options:
+        - Left out something I needed
+        - Said something wrong or overstated
+        - Still too long or padded
+        - Hard to read
+        - Didn't turn on or off when asked
+    validations:
+      required: true
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Your message
+      description: The exact message you sent with Lembas on.
+    validations:
+      required: true
+  - type: textarea
+    id: reply
+    attributes:
+      label: Lembas reply
+      description: Paste the reply you got.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What a good reply would include
+      description: The fact, warning or step that should have been there, or what should have been cut.
+  - type: input
+    id: where
+    attributes:
+      label: Where and which model
+      placeholder: "claude.ai, Claude Opus 5.5"
+  - type: input
+    id: version
+    attributes:
+      label: Lembas version
+      placeholder: "1.1.0"

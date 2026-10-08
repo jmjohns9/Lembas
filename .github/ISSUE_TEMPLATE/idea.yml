@@ -1,0 +1,19 @@
+name: Idea or rule change
+description: Suggest a new rule, a change to an existing one, or a new benchmark prompt.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should Lembas do differently?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: An example prompt where the current behavior falls short helps most.
+  - type: markdown
+    attributes:
+      value: Rule changes are accepted when the benchmark shows they help. See CONTRIBUTING.md for how to run it.
