@@ -1,17 +1,111 @@
 # Benchmarks
 
-## Method
+Lembas is measured three ways: reply length and quality on caveman's skill benchmark, fact checks on this repo's own prompts, and an end-to-end test of how much Claude Code reads while investigating large files. All runs used `claude-opus-5-5` unless noted.
 
-Each of the 11 prompts in [`evals/evals.json`](../evals/evals.json) was answered twice by Claude, each time in a fresh session:
+## Replies: caveman's skill benchmark (v2.0.0)
 
-- **Baseline:** no skill, the model's normal reply.
-- **Lembas:** the skill loaded and active.
+Ten developer questions, answered in fresh `claude -p` sessions. Arms: no system prompt, a plain `Answer concisely.` control, and each skill added to that control. Tokens counted with Claude's tokenizer. Raw data in [evals/caveman-bench](../evals/caveman-bench) (runs 11 and 12).
 
-Reply length is measured with [`scripts/count_tokens.py`](../scripts/count_tokens.py). Tokens are estimated as characters divided by 4, because the tokenizer download was blocked in the test environment. That is accurate enough for comparing percentages; the absolute counts are estimates. Run with `--tiktoken` for exact counts if you have the tokenizer.
+### Length
 
-Fact retention is checked with [`scripts/grade.py`](../scripts/grade.py). For every reply it checks the facts listed under `must_contain`, that the reply opens with the answer, that it doesn't end with an offer of help, and that it has no dashes. Replies were also read by hand, which caught several checker false positives (fixed in v1.0.0) and confirmed the safety answer kept every protective step.
+| Arm | Shorter than "Answer concisely." (median), run 11 / run 12 | Shorter than no prompt (total), run 11 / run 12 |
+|---|---:|---:|
+| Lembas 1.1.0 | 48% / 47% | 69% / 69% |
+| **Lembas 2.0.0** | **37% / 35%** | **61% / 62%** |
+| ultracave | 34% / 35% | 56% / 60% |
+| "Answer concisely." alone | | 37% / 38% |
 
-## Results for v1.0.0
+### Quality (blind review)
+
+Four reviewers, two per run, each saw anonymous, shuffled answers next to the full no-prompt answer. For each answer they recorded errors, missing points, a verdict, whether it explains why its fix is right, whether it gives alternatives with conditions, and a 1 to 5 score for how well it equips the asker to choose and act.
+
+| Arm | Complete | Minor gap | Major gap | Answers with an error | Explains why | Alternatives with conditions | Decision quality |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Lembas 2.0.0** | **19 of 20** | 1 | 0 | **1** | **20 of 20** | **19 of 20** | **4.85** |
+| ultracave | 17 of 20 | 3 | 0 | 4 | 18 of 20 | 15 of 20 | 4.45 |
+| Lembas 1.1.0 | 12 of 20 | 8 | 0 | 2 | 17 of 20 | 14 of 20 | 3.90 |
+
+The errors found: Lembas 2.0 said CORS is "enforced by the server's policy" (the browser enforces it; the server declares it). Ultracave twice overstated what debouncing prevents, implied queues give exactly-once delivery, and gave an imprecise React Compiler version requirement. Lembas 1.1 wrote ANALYZE where it meant EXPLAIN ANALYZE, and called congestion control "flow control".
+
+**Reading it:** 2.0 gives up about 12 points of savings against 1.1 and buys back most of what 1.1 lost: completeness from 12 to 19 of 20, and decision quality from 3.90 to 4.85. It saves slightly more than ultracave while scoring higher on every quality measure.
+
+## Replies: this repo's prompts (v2.0.0)
+
+The 11 prompts in [`evals/evals.json`](../evals/evals.json), one reply per arm, graded by [`scripts/grade.py`](../scripts/grade.py). Replies are in [`evals/results/v2.0.0`](../evals/results/v2.0.0). Tokens are billed output tokens.
+
+| Arm | Average reply | Key facts kept | Four-part structure on problem prompts |
+|---|---:|---:|---:|
+| No skill | 1,104 tokens | all | n/a |
+| Lembas 1.1.0 | 414 tokens | all | 0 of 5 (not part of 1.1) |
+| **Lembas 2.0.0** | **616 tokens** | **all** | **5 of 5** |
+
+2.0 replies are 44% shorter than no-skill replies. Advice prompts grow the most under the four-part shape: the interview-prep reply is 948 tokens against 413 for 1.1. One 2.0 reply used two dashes, which the style rules forbid; no-skill replies had dashes in 6 of 11.
+
+## Squeeze
+
+### Compression
+
+[`squeeze.py`](../skills/lembas/scripts/squeeze.py) on real and generated files, counted with Claude's tokenizer. Every planted fact (the root-cause traceback, failed order IDs and error codes, the exact revenue total, null counts, the one bad row) is present in the summary; [`tests/test_squeeze.py`](../tests/test_squeeze.py) checks them.
+
+| File | Source | Tokens | Squeezed | Smaller |
+|---|---|---:|---:|---:|
+| app.log (24,000 lines, one incident) | generated | 859,037 | 1,555 | 99.8% |
+| events.jsonl (5,000 events) | generated | 223,451 | 525 | 99.8% |
+| sales.csv (9,000 rows) | generated | 249,942 | 639 | 99.7% |
+| orders.json (640 orders) | generated | 119,406 | 1,500 | 98.7% |
+| dpkg.log (9,413 lines) | real system log | 306,815 | 1,113 | 99.6% |
+| airports.csv (3,376 rows) | real public data | 94,728 | 623 | 99.3% |
+| npm package metadata (typescript) | real API response | 174,398 | 1,251 | 99.3% |
+| seattle-weather.csv (1,461 rows) | real public data | 35,546 | 521 | 98.5% |
+| npm search results (250 packages) | real API response | 87,397 | 1,405 | 98.4% |
+| npm install, verbose (598 lines) | real build log | 19,879 | 1,011 | 94.9% |
+
+A 1.9 MB log takes about 0.7 seconds.
+
+### End to end in Claude Code
+
+[`evals/squeeze-bench/run_e2e.py`](../evals/squeeze-bench/run_e2e.py) starts Claude Code headless in a fresh folder with one file, allows Bash, Read, Grep and Glob, and asks a realistic question: find the cause of an incident in a log, list failed orders in an API response, total a CSV and find bad rows, list failing tests from a 4,000-test run, and so on. It records billed usage (fresh input, cache writes and cache reads all count as input) and grades the answer against planted facts. Arms: plain Claude Code, the skill, the hook, and both.
+
+**Opus 5.5, 8 tasks on large files (57 KB to 1.9 MB), 2 runs each**
+
+| Arm | Total input | Cost | Correct | Mean turns |
+|---|---:|---:|---:|---:|
+| Plain Claude Code | 2.80M | $2.28 | 16 of 16 | 4.4 |
+| Skill | 2.51M (−10%) | $1.85 (−19%) | 16 of 16 | 3.8 |
+| Hook | 2.92M (+4%) | $2.23 (−2%) | 16 of 16 | 4.5 |
+| Skill and hook | 2.61M (−7%) | $1.80 (−21%) | 16 of 16 | 4.0 |
+
+A confirmation round with the final skill wording (1 run each) gave: skill 1.19M input and $1.02, skill and hook 1.23M and $0.97, against plain Claude Code's 1.40M and $1.14 per round. All 16 answers correct.
+
+**Opus 5.5, 3 tasks on mid-size files (94 KB to 143 KB, under Claude Code's read limits), 2 runs each**
+
+| Arm | Total input | Cost | Correct |
+|---|---:|---:|---:|
+| Plain Claude Code | 1.10M | $0.93 | 6 of 6 |
+| Skill | 1.10M | $0.79 | 6 of 6 |
+| Hook | 1.11M | $0.95 | 6 of 6 |
+| Skill and hook | 1.08M | $0.75 | 5 of 6 |
+
+The one miss found four duplicate rows that the fixture generator had produced by chance and reported those, but left out the three blank sales-rep cells the grader looked for.
+
+**Haiku 4.5, 8 tasks on large files, 1 run each**
+
+| Arm | Total input | Cost | Correct |
+|---|---:|---:|---:|
+| Plain Claude Code | 1.59M | $0.65 | 7 of 8 |
+| Hook | 1.20M (−25%) | $0.54 (−17%) | 8 of 8 |
+
+### What the end-to-end runs show
+
+- **Opus 5.5 rarely lets a large output reach the model.** It queries with `grep | head`, pipes test runs through `tail -100`, and redirects big output to a file before reading parts of it. Claude Code also caps Bash output at 30,000 characters and Read at 256 KB. So the hook seldom has anything to squeeze, and on Opus it is neutral.
+- **Turns drive input cost.** Every turn re-sends a fixed 30,000 to 37,000 tokens of system prompt and tool definitions plus the conversation so far. Fewer, batched queries saved more than compressing outputs.
+- **Squeezing a deliberate query backfires.** An early hook squeezed narrow `grep` results. Claude worked around the summary with extra commands and used more tokens (477,000 against 269,000 on the incident task). The shipped hook leaves narrowed commands alone.
+- **The hook helps models that read raw output.** On Haiku 4.5 one task fell from 13 turns to 2.
+- **Cost falls more than input** for the skill arms, because Lembas replies are shorter and output tokens cost more than input tokens.
+
+## History: v1.x
+
+### 11 prompts, v1.0.0
 
 | Prompt | Category | Baseline | Lembas | Cut |
 |---|---|---:|---:|---:|
@@ -28,73 +122,34 @@ Fact retention is checked with [`scripts/grade.py`](../scripts/grade.py). For ev
 | prod-table-rebuild-safety | safety | 874 | 558 | 36.2% |
 | **Total** | | **7,583** | **2,447** | **67.7%** |
 
-Fact checks: Lembas 65 of 65, baseline 63 of 65 (two baseline replies end with an offer of help).
+Tokens estimated as characters divided by 4. Fact checks: Lembas 65 of 65, baseline 63 of 65.
 
-### Reading the results
+### Versions
 
-- **Explanations, comparisons, advice and troubleshooting** shrink the most (69% to 79%). These are the replies with the most padding: headers, long lists, background and closing offers.
-- **Code answers** shrink less (57% to 71%) because the code is most of the reply and is never shortened.
-- **Writing tasks** shrink about half. Lembas removes the framing around a draft, not the draft itself.
-- **Safety answers** shrink the least by design. Lembas keeps every step and warning for irreversible actions, and only removes padding.
+| Version | Cut on 11 prompts | Skill file (words) | Main change |
+|---|---:|---:|---|
+| 0.2.0 | 58.9% | 944 | 40% length target, top causes only, one sentence per item |
+| 0.3.0 | 60.1% | 1,088 | No lead-ins, echoes or repeated closers |
+| 0.4.0 | 67.2% / 65.6% | 1,177 | Word budgets by question type |
+| 1.0.0 | 67.7% | 848 | Restructured and trimmed |
+| 1.1.0 | not rerun | 909 | Always keep the main gotcha |
+| **2.0.0** | see above | 1,043 | Four-part answers, input-token section, squeeze |
 
-## Version history
-
-All figures are the total reduction against the same baseline replies.
-
-| Version | 5 original prompts | 11 prompts | Skill file (words) | Main change |
-|---|---:|---:|---:|---|
-| 0.1.0 | 58.1% | | not saved | First draft |
-| 0.2.0 | 64.1% | 58.9% | 944 | 40% length target, top causes only, one sentence per item |
-| 0.3.0 | | 60.1% | 1,088 | No lead-ins, echoes or repeated closers |
-| 0.4.0 | | 67.2% / 65.6% | 1,177 | Word budgets by question type |
-| **1.0.0** | | **67.7%** | **848** | Restructured and trimmed the skill file |
-
-Two things stand out:
-
-- **v0.2 looked like it passed 60% but didn't generalize.** It cut 64% on the 5 prompts it was tuned on, then only 59% once 6 new prompts were added. Testing on prompts the skill wasn't tuned on matters.
-- **Rewording rules stopped paying off; word budgets didn't.** v0.3's extra rules gained about one point, which is within noise. Giving the model a concrete number of words to aim for gained seven.
-
-## Caveman skill benchmark
-
-Lembas was also run on caveman's own skill benchmark: 10 developer questions on `claude-opus-5-5`, scored as the cut **beyond a plain `Answer concisely.` instruction**, which is stricter than the comparison above. Method and raw data are in [evals/caveman-bench](../evals/caveman-bench).
-
-### Token savings beyond "Answer concisely." (median per question)
+### Caveman benchmark, v1.x
 
 | Arm | Run 1 | Run 2 | Run 3 | Run 4 |
 |---|---:|---:|---:|---:|
-| **Lembas 1.1.0** | | | **49%** | **52%** |
+| Lembas 1.1.0 | | | 49% | 52% |
 | Lembas 1.0.0 | 54% | 55% | 52% | 53% |
 | ultracave | 34% | 41% | 29% | 45% |
 | megacave | 7% | 18% | | |
 | caveman | 5% | 12% | | |
 
-Real billed output tokens on 3 of the questions, against the control: Lembas 1.0.0 cut 60% (run 1) and 58% (run 3); Lembas 1.1.0 cut 58% (run 3); megacave 27% and ultracave 19% (run 1).
+Median cut beyond "Answer concisely.". Megacave answers in Classical Chinese, which looks cheap under OpenAI's tokenizer (caveman's default scorer) but saves little in Claude's tokenizer and billing.
 
-Megacave answers in Classical Chinese. Caveman's scorer uses OpenAI's tokenizer, which makes that look cheap; counted with Claude's tokenizer and Claude's billing, it saves little.
+## Noise and limits
 
-### Fidelity (blind review)
-
-A separate reviewer compared each anonymous answer with the full control answer. No version had a major gap.
-
-| Arm | Complete | Minor gap | Errors found |
-|---|---:|---:|---:|
-| Lembas 1.0.0, run 1 | 2 of 10 | 8 | 1 |
-| Lembas 1.0.0, runs 3 and 4 | 9 of 20 | 11 | 5 |
-| **Lembas 1.1.0, runs 3 and 4** | **12 of 20** | **8** | **2** |
-| ultracave, run 1 | 10 of 10 | 0 | 0 |
-| ultracave, runs 3 and 4 | 16 of 20 | 4 | 5 |
-
-v1.0.0 most often dropped the one gotcha a developer would trip on, such as returning connections to a pool or worst-case O(n) hash lookups. v1.1.0 keeps the main gotcha, which raised completeness and cut errors for about 2 points of savings. Ultracave is still more complete, at roughly half the savings.
-
-The reviewers disagreed with each other a lot: the run 3 reviewer passed 3 of 10 Lembas 1.1.0 answers and the run 4 reviewer passed 9 of 10. Treat the fidelity numbers as directional.
-
-## Noise
-
-v0.4 was run twice on the same 11 prompts. The totals were 67.2% and 65.6%. One prompt (tableau-slow-dashboard-debug) swung from 80.9% to 70.5%. Treat any total difference under about 3 points as noise unless it holds across repeated runs.
-
-## Limitations
-
-- One reply per prompt per version, except the v0.4 repeat.
-- 11 prompts, mostly technical and analytics topics. Results on creative or very short conversational prompts may differ.
-- Token counts are estimates (characters / 4).
-- Replies were generated in simulated single-turn sessions. In long conversations, Lembas has to stay on across many turns; that was not measured.
+- Runs vary. v0.4 run twice on the same prompts gave 67.2% and 65.6%, and single prompts swing by up to 10 points. Reviewers also disagree: in v1.1 testing, one reviewer passed 3 of 10 answers and another passed 9 of 10. Treat differences under about 3 points, and single-run results, as directional.
+- The end-to-end benchmark has 11 tasks and 1 or 2 runs per arm. The Haiku result is one run.
+- The fixtures are generated with known answers, plus six real files: two logs from one Linux machine, two npm registry responses and two public CSV datasets. Logs from other systems may detect or summarize differently.
+- Replies were single-turn. Staying in Lembas mode across a long conversation was not measured.

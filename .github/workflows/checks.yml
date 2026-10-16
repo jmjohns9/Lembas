@@ -25,10 +25,13 @@ jobs:
           grep -q '^description:' skills/lembas/SKILL.md
 
       - name: Reply length
-        run: python3 scripts/count_tokens.py evals/results/v1.0.0
+        run: python3 scripts/count_tokens.py evals/results/v2.0.0
 
-      - name: Facts kept and filler removed
-        run: python3 scripts/grade.py evals/evals.json evals/results/v1.0.0
+      - name: Facts kept and answer structure
+        run: python3 scripts/grade.py evals/evals.json evals/results/v2.0.0
+
+      - name: Squeeze compressor and hook
+        run: python3 tests/test_squeeze.py
 
       - name: Package builds
         run: |

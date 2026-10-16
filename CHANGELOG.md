@@ -2,6 +2,32 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
+## [2.0.0] - 2026-10-15
+
+A rewrite. Answers to problems and choices now give the problem, the fix, the alternatives and why the fix wins. Lembas also cuts input tokens now, with a compressor for large logs, JSON and CSV.
+
+### Changed
+- **New answer shape.** Debugging, how-to and design questions get four labeled parts: **Problem** (the root cause as a mechanism), **Fix** (exact code or commands plus how to confirm it worked), **Alternatives** (each with the condition under which it wins) and **Why this fix** (the deciding trade-off). Concept questions give the mechanism, when to use each option and the common trap, without labels.
+- **Budgets** are 50 words for quick facts, 130 for concepts and 200 for problems and choices, up from 60, 120 and 150, to make room for alternatives and reasoning.
+- **Detail now means specificity:** the exact flag, version, limit, error text or command.
+- The 13 numbered rules became four short sections (answer shapes, what to cut, what never to cut, when to relax), plus one worked example on a topic outside every benchmark.
+
+### Added
+- **`scripts/squeeze.py`:** shrinks large logs, JSON, JSONL and CSV by 95% to 99.8% while keeping every error, stack trace, failing record and column profile. The original is saved and the summary gives its path and line numbers.
+- **`hooks/squeeze_hook.py`:** an optional Claude Code hook that squeezes large Bash and Read results before Claude reads them. Commands that already narrow their output (`grep`, `head`, a `jq` filter) are left alone.
+- **"Reading large outputs" in the skill:** size data first, query it narrowly, batch related queries into one command, and squeeze only output that can't be narrowed in advance.
+- `tests/`: 23 tests for the compressor and hook, plus a fixture generator with planted answers.
+- `evals/squeeze-bench/`: an end-to-end benchmark that runs Claude Code on 11 investigation tasks with and without the skill and hook.
+- `evals/generate_replies.py`: generates and grades replies for `evals/evals.json`.
+
+### Results
+- **Replies:** 35% to 37% shorter than with "Answer concisely." alone and about 60% shorter than with no prompt (Claude tokenizer, caveman's 10 prompts, 2 runs). Lembas 1.1 cut more (47% to 48%) but dropped detail.
+- **Blind review, 20 answers:** complete on 19 (1.1: 12; ultracave: 17), one factual error (1.1: 2; ultracave: 4), and decision quality 4.85 of 5 (1.1: 3.90; ultracave: 4.45).
+- **Input tokens:** with Opus 5.5 in Claude Code, the skill cut total input by 10% to 15% and cost by 10% to 19%. The hook alone was neutral on Opus, because Claude Code already queries before reading, and cut input by 25% on Haiku 4.5.
+
+### Notes
+- `grade.py` now fails only on missing facts or a missing four-part structure. Style misses (an opener, a closing offer, dashes) are reported as warnings. One 2.0 reply used two dashes; it is recorded, not hidden.
+
 ## [1.1.0] - 2026-10-08
 
 Tested on caveman's skill benchmark. Cuts 49% to 52% beyond a plain "Answer concisely." instruction (median), and 58% in Claude's billed output tokens.
@@ -64,5 +90,6 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
+[2.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.0.0
 [1.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.1.0
 [1.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.0.0

@@ -4,36 +4,60 @@
 [![Release](https://img.shields.io/github/v/release/jmjohns9/lembas)](https://github.com/jmjohns9/lembas/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-**A Claude skill that cuts reply length by about two thirds without losing facts.**
+**A Claude skill for short, dense engineering answers: the problem, the fix, the alternatives and why the fix wins.**
 
-In *The Lord of the Rings*, one small bite of elven bread called lembas fills a traveler for a whole day. Lembas replies work the same way: small, complete, nothing extra to carry.
+In *The Lord of the Rings*, one small bite of elven bread called lembas feeds a traveler for a day. Lembas answers work the same way: small, because every sentence carries something you need.
 
-Most of a typical AI reply isn't the answer. It's setup, a restated question, hedging, background nobody asked for, three examples where one would do, a recap and an offer to help. Lembas cuts those and keeps everything that matters: facts, numbers, code, commands, caveats and safety warnings. Sentences stay whole and natural. It reads like a sharp colleague, not a telegram.
+Most of a typical AI reply isn't the answer. It's setup, a restated question, hedging, background nobody asked for and an offer to help. Lembas cuts those. What's left reads like a staff engineer's code review comment: the root cause, the exact fix and how to confirm it, the alternatives with when each one wins, and the trade-off that decides it.
 
-| | Without Lembas | With Lembas |
-|---|---|---|
-| Average reply (11 test prompts) | 689 tokens | 222 tokens |
-| Reduction | | **67.7%** |
-| Key facts kept | 65 of 65 checks | 65 of 65 checks |
+Version 2.0 also cuts what Claude **reads**. It queries large files before reading them, and it ships a compressor that turns a 24,000-line log into a 1,500-token summary that keeps every error.
 
-Measured on v1.0.0. On [caveman's own skill benchmark](evals/caveman-bench), v1.1.0 cuts a further 49% to 52% beyond a plain "Answer concisely." instruction (58% in Claude's billed tokens), against 29% to 45% for caveman's ultracave mode. Ultracave keeps more detail, though: in a blind review it was complete on 16 of 20 answers to Lembas's 12. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for methods and full results.
+## Results
+
+| | "Answer concisely." | Lembas 1.1 | ultracave | **Lembas 2.0** |
+|---|---:|---:|---:|---:|
+| Shorter than no prompt (total) | 37% to 38% | 69% | 56% to 60% | **61% to 62%** |
+| Shorter than "Answer concisely." (median) | | 47% to 48% | 34% to 35% | **35% to 37%** |
+| Complete in blind review | | 12 of 20 | 17 of 20 | **19 of 20** |
+| Answers with a factual error | | 2 | 4 | **1** |
+| Decision quality (1 to 5) | | 3.90 | 4.45 | **4.85** |
+
+Caveman's 10 developer questions, 2 runs, Claude Opus 5.5, counted with Claude's tokenizer. Blind reviewers scored anonymous answers against the full no-prompt answer. Full method and data in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+**Input tokens.** `squeeze.py` shrinks large logs, JSON and CSV by 95% to 99.8%. In end-to-end Claude Code runs on Opus 5.5, the skill cut total input by 10% to 15% and cost by 10% to 19%, with every answer correct. The optional hook cut input by 25% on Haiku 4.5. See [docs/SQUEEZE.md](docs/SQUEEZE.md).
 
 ## Example
 
-**Prompt:** *My Tableau Server dashboard takes 45 seconds to load but runs in 5 seconds in Desktop. It uses a live connection to SQL Server and has 8 sheets with a few LOD calcs. What should I check?*
+**Prompt:** *My cron job works when I run it by hand but does nothing under cron.*
 
-Without Lembas the reply is about 1,130 tokens: a six-part checklist with headers, sub-bullets and a summary. With Lembas it is about 240 tokens: one sentence naming the first move, four ranked checks in one sentence each, and nothing after. Both versions are in [evals/results/v1.0.0/tableau-slow-dashboard-debug](evals/results/v1.0.0/tableau-slow-dashboard-debug).
+> **Problem.** Cron runs jobs with a minimal environment (`PATH=/usr/bin:/bin`, no shell profile), so `python3` from pyenv or Homebrew and any relative path fail, and cron discards the error.
+>
+> **Fix.** Use absolute paths and keep the output: `*/5 * * * * /usr/local/bin/python3 /opt/app/job.py >> /var/log/job.log 2>&1`. Wait one cycle and read the log to confirm.
+>
+> **Alternatives.** Set `PATH=` at the top of the crontab if many jobs share the same tools. Move to a systemd timer if you need retries, journald logging or a dependency on the network being up.
+>
+> **Why this fix.** It fixes the cause with a one-line change, and the redirect turns the next silent failure into a readable error.
+
+Concept questions ("What's the difference between X and Y?") skip the labels: the mechanism, when to use each, and the common trap. More replies are in [evals/results/v2.0.0](evals/results/v2.0.0).
 
 ## Install
 
-**Claude apps (claude.ai, desktop, Cowork):** download [`lembas.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/lembas.skill) from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), open it in Claude and click **Save skill**. To build it yourself, run `scripts/package.sh` and use `dist/lembas.skill`.
+**Claude apps (claude.ai, desktop):** download [`lembas.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/lembas.skill) from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), open it in Claude and click **Save skill**. To build it yourself, run `scripts/package.sh` and use `dist/lembas.skill`.
 
-**Claude Code:** copy the skill folder into your skills directory.
+**Claude Code:**
 
 ```bash
 git clone https://github.com/jmjohns9/lembas.git
 cp -r lembas/skills/lembas ~/.claude/skills/
 ```
+
+**Optional Claude Code hook** (squeezes large tool outputs automatically; worth it on smaller models or with raised output limits, see [docs/SQUEEZE.md](docs/SQUEEZE.md#should-you-install-the-hook)):
+
+```bash
+python3 ~/.claude/skills/lembas/hooks/squeeze_hook.py --print-settings
+```
+
+Merge the JSON it prints into `~/.claude/settings.json`.
 
 ## Use
 
@@ -43,35 +67,40 @@ cp -r lembas/skills/lembas ~/.claude/skills/
 | "be brief", "be concise", "save tokens", "cut the fluff" | Lembas usually triggers on these too |
 | "stop lembas" or "normal mode" | Lembas turns off |
 
+The compressor works on its own, with or without the skill:
+
+```bash
+python3 skills/lembas/scripts/squeeze.py app.log
+npm test 2>&1 | python3 skills/lembas/scripts/squeeze.py
+```
+
 ## What it does
 
-- **Answers in the first sentence.** The verdict or fix comes first.
-- **Cuts ceremony.** No greetings, praise, restated questions, recaps or "hope this helps".
-- **Picks instead of surveying.** The three or four most likely causes, not every possible one. One example, not three.
-- **Keeps the gotcha.** The one mistake people most often hit on a topic always stays in.
-- **Sets word budgets.** 60 words for a quick fact, 120 for an explanation, 150 for how-to or advice. Code doesn't count.
-- **Keeps the payload exact.** Code, commands, paths, numbers and error messages are never shortened.
-- **Writes in plain language.** Full sentences and normal grammar. No fragments, invented abbreviations or caveman voice.
+- **Names the cause, not the symptom.** If the cause is uncertain, it gives the likeliest one and the check that confirms it.
+- **Gives the exact fix and how to confirm it worked.** Code, commands, paths and numbers are never shortened.
+- **Weighs alternatives.** Each one says when it beats the recommended fix. Alternatives without a condition are dropped.
+- **Says why the fix wins.** The deciding trade-off, in a sentence or two, plus the trap people most often hit.
+- **Cuts ceremony.** No greetings, praise, restated questions, recaps or offers of help.
+- **Sets budgets.** 50 words for a quick fact, 130 for a concept, 200 for a problem or choice. Code doesn't count.
+- **Reads less.** It sizes files first, queries them narrowly, batches related queries, and squeezes output it can't narrow.
 
 ## When it doesn't cut
 
-Lembas relaxes for safety warnings, irreversible actions, multi-step procedures where a missing step causes failure, a confused user, and anything saved outside the chat (code, commits, docs, emails sent as you). Those answers stay complete. They still skip padding, so they usually come out somewhat shorter.
-
-In testing, a question about rebuilding a production Postgres table came back at 36% shorter instead of 68%, and it kept every protective step: a tested backup, a single-transaction swap, keeping the old table until verified, and a rehearsal on staging.
+Lembas relaxes for safety warnings, irreversible actions, multi-step procedures where a missing step causes failure, a confused user, and anything saved outside the chat (code, commits, docs, emails sent as you). Those answers stay complete. They still skip padding.
 
 ## Repository layout
 
 ```
-skills/lembas/SKILL.md      The skill itself
-evals/evals.json            11 benchmark prompts and the facts each reply must keep
-evals/results/v1.0.0/       Baseline and Lembas replies for each prompt
-evals/caveman-bench/        Results on caveman's skill benchmark
-scripts/count_tokens.py     Measures the reduction
-scripts/grade.py            Checks facts kept and filler removed
-scripts/package.sh          Builds dist/lembas.skill
-docs/BENCHMARKS.md          Method, results and version history
-docs/DESIGN.md              Why each rule exists
-.github/workflows/checks.yml  Reruns the fact checks on every push
+skills/lembas/SKILL.md                 The skill
+skills/lembas/scripts/squeeze.py       Compressor for logs, JSON and CSV
+skills/lembas/hooks/squeeze_hook.py    Optional Claude Code hook
+tests/                                 Compressor and hook tests, fixture generator
+evals/evals.json                       11 prompts and the facts each reply must keep
+evals/results/v2.0.0/                  Replies with and without Lembas
+evals/caveman-bench/                   Results on caveman's skill benchmark
+evals/squeeze-bench/                   End-to-end input-token benchmark
+scripts/                               Token counter, grader, packager
+docs/                                  Benchmarks, design notes, compressor guide
 ```
 
 ## Contributing
@@ -80,7 +109,7 @@ Found a reply that left out something important? [Open an issue](https://github.
 
 ## Credits
 
-Lembas started as a reverse engineering of [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee. Several ideas come from it: answer first, keep the payload verbatim, persistence until switched off, and a pre-send check. Lembas drops caveman's fragment style in favor of natural sentences and adds word budgets. See [NOTICE](NOTICE).
+Lembas started as a reverse engineering of [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee. Several ideas come from it: answer first, keep the payload verbatim, persistence until switched off, and a pre-send check. Lembas drops caveman's fragment style in favor of natural sentences, and adds budgets, the four-part answer shape and input compression. See [NOTICE](NOTICE).
 
 ## License
 
