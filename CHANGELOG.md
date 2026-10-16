@@ -2,6 +2,22 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
+## [2.1.0] - 2026-10-16
+
+Adds Ithildin, a second skill for long documents.
+
+### Added
+- **`skills/ithildin`:** answers questions about long PDFs, Word files, PowerPoint decks, Markdown, HTML and text without reading them whole. It maps the document, searches for the facts and reads only the sections that answer, citing pages.
+- **`ithildin.py`** with four commands: `map` (outline with page ranges, gists, tables, figures and defined terms, fitted to a token budget), `find` (several patterns in one call, with hit counts per section, matching phrases that wrap across PDF lines), `read` (exact text of sections, pages or lines, with a precise continuation point) and `table` (one table as rows).
+- Structure comes from bookmarks, heading styles and slide titles, then from type sizes in PDFs without bookmarks, then from section numbering. Running headers, footers and contents pages are removed so they don't become fake sections.
+- `tests/test_ithildin.py` (20 tests) and `tests/ithildin_fixtures.py`, which builds a 126-page manual as a PDF with and without bookmarks, a Word file and Markdown, with five planted facts.
+- `evals/ithildin-bench/`: an end-to-end Claude Code benchmark and its results.
+- `scripts/package.sh` builds `dist/ithildin.skill` alongside `dist/lembas.skill`.
+
+### Results
+- **Maps are 37 to 190 times smaller than the documents:** 2,247 tokens for a 126-page manual (88,533 tokens whole) and 1,699 for a 395-page book (249,857 tokens whole), counted with Claude's tokenizer.
+- **Claude Code, Opus 5.5, 6 questions, 2 runs:** 26% less input (10% to 38% by question), 4.5 to 3.1 turns on average, and 12 of 12 correct in both arms. Cost fell 3%, within the noise from shared prompt caching.
+
 ## [2.0.0] - 2026-10-15
 
 A rewrite. Answers to problems and choices now give the problem, the fix, the alternatives and why the fix wins. Lembas also cuts input tokens now, with a compressor for large logs, JSON and CSV.
@@ -90,6 +106,7 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
+[2.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.1.0
 [2.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.0.0
 [1.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.1.0
 [1.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.0.0

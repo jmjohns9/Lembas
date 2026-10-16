@@ -103,6 +103,10 @@ The one miss found four duplicate rows that the fixture generator had produced b
 - **The hook helps models that read raw output.** On Haiku 4.5 one task fell from 13 turns to 2.
 - **Cost falls more than input** for the skill arms, because Lembas replies are shorter and output tokens cost more than input tokens.
 
+## Ithildin
+
+Ithildin, the long-document skill added in 2.1.0, has its own results in [ITHILDIN.md](ITHILDIN.md#results-in-claude-code): maps 37 to 190 times smaller than the documents, and 26% less input in Claude Code on six document questions, with every answer correct. Raw runs are in [`evals/ithildin-bench/results-opus-5-5.json`](../evals/ithildin-bench/results-opus-5-5.json).
+
 ## History: v1.x
 
 ### 11 prompts, v1.0.0

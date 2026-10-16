@@ -18,11 +18,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Skill file has name and description
+      - name: Skill files have name and description
         run: |
-          head -1 skills/lembas/SKILL.md | grep -qx -- '---'
-          grep -q '^name: lembas$' skills/lembas/SKILL.md
-          grep -q '^description:' skills/lembas/SKILL.md
+          for s in lembas ithildin; do
+            head -1 skills/$s/SKILL.md | grep -qx -- '---'
+            grep -q "^name: $s$" skills/$s/SKILL.md
+            grep -q '^description:' skills/$s/SKILL.md
+          done
 
       - name: Reply length
         run: python3 scripts/count_tokens.py evals/results/v2.0.0
@@ -33,7 +35,14 @@ jobs:
       - name: Squeeze compressor and hook
         run: python3 tests/test_squeeze.py
 
+      - name: Ithildin document reader
+        run: |
+          sudo apt-get install -y -qq poppler-utils
+          pip install -q pypdf pdfplumber reportlab python-docx python-pptx
+          python3 tests/test_ithildin.py
+
       - name: Package builds
         run: |
           bash scripts/package.sh
           unzip -l dist/lembas.skill | grep -q 'lembas/SKILL.md'
+          unzip -l dist/ithildin.skill | grep -q 'ithildin/scripts/ithildin.py'

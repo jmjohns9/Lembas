@@ -12,6 +12,8 @@ Most of a typical AI reply isn't the answer. It's setup, a restated question, he
 
 Version 2.0 also cuts what Claude **reads**. It queries large files before reading them, and it ships a compressor that turns a 24,000-line log into a 1,500-token summary that keeps every error.
 
+The repo also holds a second skill, **[Ithildin](#ithildin-long-documents)**, for long documents. It maps a 400-page book in about 2,000 tokens, then reads only the sections a question needs.
+
 ## Results
 
 | | "Answer concisely." | Lembas 1.1 | ultracave | **Lembas 2.0** |
@@ -42,13 +44,14 @@ Concept questions ("What's the difference between X and Y?") skip the labels: th
 
 ## Install
 
-**Claude apps (claude.ai, desktop):** download [`lembas.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/lembas.skill) from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), open it in Claude and click **Save skill**. To build it yourself, run `scripts/package.sh` and use `dist/lembas.skill`.
+**Claude apps (claude.ai, desktop):** download [`lembas.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/lembas.skill) and, for long documents, [`ithildin.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/ithildin.skill) from the [latest release](https://github.com/jmjohns9/lembas/releases/latest). Open each in Claude and click **Save skill**. The two skills are independent; install either or both. To build them yourself, run `scripts/package.sh`.
 
 **Claude Code:**
 
 ```bash
 git clone https://github.com/jmjohns9/lembas.git
 cp -r lembas/skills/lembas ~/.claude/skills/
+cp -r lembas/skills/ithildin ~/.claude/skills/    # optional: long documents
 ```
 
 **Optional Claude Code hook** (squeezes large tool outputs automatically; worth it on smaller models or with raised output limits, see [docs/SQUEEZE.md](docs/SQUEEZE.md#should-you-install-the-hook)):
@@ -88,19 +91,39 @@ npm test 2>&1 | python3 skills/lembas/scripts/squeeze.py
 
 Lembas relaxes for safety warnings, irreversible actions, multi-step procedures where a missing step causes failure, a confused user, and anything saved outside the chat (code, commits, docs, emails sent as you). Those answers stay complete. They still skip padding.
 
+## Ithildin: long documents
+
+Ithildin answers questions about long PDFs, Word files, decks and books without reading them whole. It maps the document (outline, page ranges, tables, defined terms), searches for the facts, and reads only the sections that answer the question, citing a page for each fact.
+
+```bash
+python3 skills/ithildin/scripts/ithildin.py map   handbook.pdf
+python3 skills/ithildin/scripts/ithildin.py find  handbook.pdf "parental leave" "family leave"
+python3 skills/ithildin/scripts/ithildin.py read  handbook.pdf 6.2
+```
+
+| | Whole document | Map |
+|---|---:|---:|
+| 126-page manual (PDF) | 88,533 tokens | 2,247 tokens |
+| 395-page book (PDF, no bookmarks) | 249,857 tokens | 1,699 tokens |
+
+In Claude Code on six questions about those two documents, Ithildin cut input by 26% and turns by a third, with every answer correct in both arms. Details, formats and limits are in [docs/ITHILDIN.md](docs/ITHILDIN.md).
+
 ## Repository layout
 
 ```
 skills/lembas/SKILL.md                 The skill
 skills/lembas/scripts/squeeze.py       Compressor for logs, JSON and CSV
 skills/lembas/hooks/squeeze_hook.py    Optional Claude Code hook
-tests/                                 Compressor and hook tests, fixture generator
+skills/ithildin/SKILL.md               Ithildin, the long-document skill
+skills/ithildin/scripts/ithildin.py    Document mapper: map, find, read, table
+tests/                                 Tests and fixture generators for both skills
 evals/evals.json                       11 prompts and the facts each reply must keep
 evals/results/v2.0.0/                  Replies with and without Lembas
 evals/caveman-bench/                   Results on caveman's skill benchmark
 evals/squeeze-bench/                   End-to-end input-token benchmark
+evals/ithildin-bench/                  End-to-end long-document benchmark and results
 scripts/                               Token counter, grader, packager
-docs/                                  Benchmarks, design notes, compressor guide
+docs/                                  Benchmarks, design notes, compressor and Ithildin guides
 ```
 
 ## Contributing
