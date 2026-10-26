@@ -37,6 +37,7 @@ jobs:
 
       - name: Ithildin document reader
         run: |
+          sudo apt-get update -qq
           sudo apt-get install -y -qq poppler-utils
           pip install -q pypdf pdfplumber reportlab python-docx python-pptx
           python3 tests/test_ithildin.py

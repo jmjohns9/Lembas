@@ -1,0 +1,469 @@
+"""Build brand/guidelines.html. Contrast ratios and sizes are computed, never typed in."""
+import re
+
+from lib import BRAND, C, PALETTE, Leaf, contrast, n, write
+from logo import ithildin_body, lembas_body
+
+LIGHT_PAIRS = [("ink", "waybread"), ("moss", "waybread"), ("gilt", "waybread"), ("lorien-green", "waybread"),
+               ("starlight", "waybread"), ("ink", "waybread-deep"), ("gilt", "waybread-deep")]
+DARK_PAIRS = [("waybread", "anduin-night"), ("silver-bark", "anduin-night"), ("mallorn-gold", "anduin-night"),
+              ("ithildin", "anduin-night"), ("lorien-leaf", "anduin-night"), ("mallorn-gold", "anduin-deep"),
+              ("silver-bark", "anduin-deep")]
+NEVER_PAIRS = [("mallorn-gold", "waybread"), ("silver-bark", "waybread"), ("lorien-green", "anduin-night"),
+               ("ithildin", "waybread")]
+
+
+def dims(rel):
+    s = open(f"{BRAND}/{rel}").read()
+    return float(re.search(r'width="([\d.]+)"', s).group(1)), float(re.search(r'height="([\d.]+)"', s).group(1))
+
+
+def pic(name, alt, width, cls=""):
+    """A logo that swaps to its dark-ground version in dark mode."""
+    return (f'<picture><source media="(prefers-color-scheme: dark)" srcset="logo/{name}-color-dark.svg">'
+            f'<img class="{cls}" src="logo/{name}-color.svg" alt="{alt}" width="{width}"></picture>')
+
+
+def mark48(inner, extra=""):
+    return f'<svg viewBox="0 0 48 48" width="96" height="96" aria-hidden="true" {extra}>{inner}</svg>'
+
+
+def contrast_rows(pairs, verdict=True):
+    rows = []
+    for fg, bg in pairs:
+        r = contrast(C[fg], C[bg])
+        if verdict:
+            tag = "AA body" if r >= 4.5 else ("AA large only" if r >= 3 else "fails")
+            cls = "pass" if r >= 4.5 else ("warn" if r >= 3 else "fail")
+        else:
+            tag, cls = "not for text", "fail"
+        rows.append(
+            f'<tr><td><span class="pair" style="background:{C[bg]};color:{C[fg]}">Aa</span></td>'
+            f'<td><code>--{fg}</code> on <code>--{bg}</code></td>'
+            f'<td class="num">{r:.2f}:1</td><td><span class="tag {cls}">{tag}</span></td></tr>')
+    return "".join(rows)
+
+
+def swatches():
+    out = []
+    original = {"mallorn-gold", "lorien-green", "silver-bark", "ithildin", "anduin-night", "waybread", "ink"}
+    for token, (name, hex_, role) in PALETTE.items():
+        on = "#FFFFFF" if contrast(hex_, "#FFFFFF") > contrast(hex_, "#0E1719") else "#0E1719"
+        badge = "" if token in original else '<span class="new">added</span>'
+        out.append(f'<figure class="swatch"><div class="chip" style="background:{hex_};color:{on}">'
+                   f'<span>{hex_}</span></div><figcaption><b>{name}</b>{badge}<code>--{token}</code>'
+                   f'<small>{role}</small></figcaption></figure>')
+    return "".join(out)
+
+
+def misuse():
+    g, night = C["mallorn-gold"], C["anduin-night"]
+    leaf = Leaf()
+    halves = leaf.halves()
+    cases = [
+        ("Don't stretch or squash it.",
+         f'<g transform="translate(24 24) scale(1.45 .7) translate(-24 -24)"><path fill="{g}" d="{halves}"/></g>'),
+        ("Don't recolour it outside the palette.",
+         f'<defs><linearGradient id="bad" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"/>'
+         f'<stop offset="1" stop-color="#ec4899"/></linearGradient></defs><path fill="url(#bad)" d="{halves}"/>'),
+        ("Don't place it on busy imagery.",
+         '<defs><pattern id="busy" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">'
+         '<rect width="3" height="6" fill="#8a6d3b"/><rect x="3" width="3" height="6" fill="#d9c49a"/></pattern></defs>'
+         f'<rect width="48" height="48" fill="url(#busy)"/><path fill="{g}" d="{halves}"/>'),
+        ("Don't close the break. It is the idea.",
+         f'<path fill="{g}" d="{leaf.outline()}"/>'),
+        ("Don't rotate it off 45°.",
+         f'<g transform="rotate(45 24 24)"><path fill="{g}" d="{halves}"/></g>'),
+        ("Don't add glows, shadows or bevels.",
+         '<defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>'
+         f'<path fill="#ffd36b" filter="url(#glow)" d="{halves}"/><path fill="{g}" d="{halves}"/>'),
+        ("Don't draw the Lembas leaf in outline; outline is Ithildin's.",
+         f'<path stroke="{g}" stroke-width="1.6" d="{halves}"/>'),
+        ("Don't give Ithildin the gold; silver is its colour.",
+         ithildin_body(Leaf(), g)),
+    ]
+    out = []
+    for cap, body in cases:
+        out.append(f'<figure class="misuse"><div class="tile dark">{mark48(body)}</div>'
+                   f'<figcaption><span class="x" aria-hidden="true">×</span>{cap}</figcaption></figure>')
+    return "".join(out)
+
+
+ICONS = {
+    "squeeze": '<path d="M4 5h16M6 9h12M8 13h8M10 17h4"/><path d="M12 20v0"/>',
+    "map": '<path d="M5 4v16M5 7h5M5 12h5M5 17h5M13 7h6M13 12h6M13 17h6"/>',
+    "find": '<circle cx="10.5" cy="10.5" r="5.5"/><path d="M14.5 14.5 19.5 19.5"/>',
+    "read": '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 10h8"/><rect x="7.5" y="13" width="9" height="4" rx=".5" fill="currentColor" stroke="none"/>',
+    "cite": '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 16.5h4"/>',
+    "leaf": f'<path d="{Leaf(0, 0, 24).outline()}{Leaf(0, 0, 24).midrib(4)}"/>',
+}
+
+
+def icons():
+    out = []
+    for name, d in ICONS.items():
+        out.append(f'<figure class="icon"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" '
+                   f'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" '
+                   f'aria-hidden="true">{d}</svg><figcaption>{name}</figcaption></figure>')
+    return "".join(out)
+
+
+def build():
+    hw, hh = dims("logo/lembas-horizontal-color.svg")
+    show_w = 400
+    k = show_w / hw
+    clear = 62.5 * k          # cap height of the L at the lockup's wordmark size (100 units)
+    concepts = [
+        ("concept-a-folded-leaf", "A. Folded leaf", "chosen",
+         "A mallorn leaf at 45°, broken once along its midrib. In the books, lembas is carried wrapped in "
+         "mallorn leaves that keep it whole, and a single wafer is enough for a day. The mark is both: the leaf "
+         "that wraps the answer, and the one clean break of a dense thing split exactly. For a developer it reads "
+         "first as a precise geometric glyph: two arcs and a straight cut, the way a staff engineer's diff is "
+         "two sides and one line."),
+        ("concept-b-broken-wafer", "B. Broken wafer", "rejected",
+         "A square wafer snapped once, the small piece set apart. It is the most literal picture of "
+         "compression, and it holds at 16 px. It lost because it reads as a slash or a crop tool before it "
+         "reads as bread, and nothing in it would make a reader of the books smile."),
+        ("concept-c-waymark-seal", "C. Waymark seal", "rejected",
+         "The leaf brooch of Lórien as a seal: a ring, an upright leaf and a star at the crown, the badge given "
+         "to the Fellowship. It has the most story and the least economy. Three elements collapse into a "
+         "smudge at 16 px, and a ring with a star drifts toward heraldry and fantasy-game crests."),
+    ]
+    concept_html = "".join(
+        f'<article class="concept {status}"><div class="tile dark"><img src="concepts/{slug}.svg" alt="{title}" width="120" height="120"></div>'
+        f'<h3>{title} <span class="tag {"pass" if status == "chosen" else "muted"}">{status}</span></h3><p>{text}</p></article>'
+        for slug, title, status, text in concepts)
+
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lembas Brand Guidelines</title>
+<meta name="description" content="Logo, colour, type, voice and Tolkien-reference rules for Lembas and Ithildin.">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {{
+  --mallorn-gold:{C["mallorn-gold"]}; --gilt:{C["gilt"]}; --lorien-green:{C["lorien-green"]}; --lorien-leaf:{C["lorien-leaf"]};
+  --silver-bark:{C["silver-bark"]}; --ithildin:{C["ithildin"]}; --starlight:{C["starlight"]};
+  --anduin-night:{C["anduin-night"]}; --anduin-deep:{C["anduin-deep"]}; --waybread:{C["waybread"]};
+  --waybread-deep:{C["waybread-deep"]}; --ink:{C["ink"]}; --moss:{C["moss"]};
+  --bg: var(--waybread); --surface: var(--waybread-deep); --text: var(--ink); --quiet: var(--moss);
+  --accent: var(--gilt); --rule: var(--silver-bark); --silver: var(--starlight);
+  --pass:#2F6B45; --warn:#8A5A00; --fail:#A3302A;
+  --serif:"Cormorant Garamond", Georgia, serif; --sans: Inter, system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light dark;
+}}
+@media (prefers-color-scheme: dark) {{
+  :root:not([data-theme="light"]) {{
+    --bg: var(--anduin-night); --surface: var(--anduin-deep); --text: var(--waybread); --quiet: var(--silver-bark);
+    --accent: var(--mallorn-gold); --rule:#2A3A3D; --silver: var(--ithildin);
+    --pass:#8FB59A; --warn:#E0B354; --fail:#F08A80;
+  }}
+}}
+:root[data-theme="dark"] {{
+  --bg: var(--anduin-night); --surface: var(--anduin-deep); --text: var(--waybread); --quiet: var(--silver-bark);
+  --accent: var(--mallorn-gold); --rule:#2A3A3D; --silver: var(--ithildin);
+  --pass:#8FB59A; --warn:#E0B354; --fail:#F08A80;
+}}
+* {{ box-sizing: border-box; }}
+html {{ -webkit-text-size-adjust: 100%; }}
+body {{ margin:0; background:var(--bg); color:var(--text); font:400 16px/1.6 var(--sans); }}
+main {{ max-width: 1080px; margin: 0 auto; padding: 0 16px 120px; }}
+@media (min-width: 720px) {{ main {{ padding: 0 40px 160px; }} }}
+img, svg {{ max-width: 100%; height: auto; display: block; }}
+a {{ color: var(--accent); text-underline-offset: 3px; }}
+code, pre {{ font-family: var(--mono); font-size: 13.5px; }}
+code {{ background: var(--surface); padding: 1px 5px; border-radius: 4px; }}
+pre {{ background: var(--surface); padding: 16px 18px; border-radius: 10px; overflow-x: auto; line-height: 1.55; border:1px solid var(--rule); }}
+pre code {{ background: none; padding: 0; }}
+h1, h2 {{ font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; line-height: 1.08; margin: 0; }}
+h1 {{ font-size: clamp(44px, 8vw, 72px); }}
+h2 {{ font-size: clamp(32px, 5vw, 44px); margin-bottom: 12px; }}
+h3 {{ font: 600 17px/1.35 var(--sans); margin: 18px 0 6px; }}
+p {{ margin: 0 0 12px; max-width: 64ch; }}
+.lead {{ font-size: 19px; color: var(--quiet); max-width: 58ch; }}
+.eyebrow {{ font: 500 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; display:flex; gap:10px; align-items:center; }}
+.eyebrow::before {{ content:""; width:10px; height:10px; background: var(--accent);
+  clip-path: path("M0.5 9.5A9 9 0 0 1 9.5 0.5A9 9 0 0 1 0.5 9.5Z"); }}
+section {{ padding-top: 88px; }}
+section + section {{ border-top: 1px solid var(--rule); margin-top: 88px; }}
+header.top {{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding: 28px 0; border-bottom:1px solid var(--rule); }}
+header.top nav {{ display:flex; flex-wrap:wrap; gap: 4px 18px; font: 500 13px/1.4 var(--mono); }}
+header.top nav a {{ color: var(--quiet); text-decoration: none; }}
+header.top nav a:hover {{ color: var(--text); }}
+.hero {{ padding: 72px 0 8px; display:grid; gap: 28px; }}
+.grid {{ display:grid; gap: 20px; }}
+.g2 {{ grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }}
+.g3 {{ grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }}
+.g4 {{ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }}
+.tile {{ border-radius: 14px; padding: 28px; display:flex; align-items:center; justify-content:center; min-height: 160px; border:1px solid var(--rule); }}
+.tile.dark {{ background: var(--anduin-night); border-color: #22323A; }}
+.tile.light {{ background: var(--waybread); border-color: var(--silver-bark); }}
+.tile.white {{ background: #fff; border-color: #d9dcd8; }}
+.tile.black {{ background: #000; border-color: #000; }}
+.cap {{ font: 500 12px/1.4 var(--mono); color: var(--quiet); margin-top: 10px; }}
+.concept p {{ color: var(--quiet); font-size: 15px; }}
+.concept.rejected .tile {{ opacity: .72; }}
+.tag {{ font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; border:1px solid currentColor; white-space: nowrap; vertical-align: 2px; }}
+.tag.pass {{ color: var(--pass); }} .tag.warn {{ color: var(--warn); }} .tag.fail {{ color: var(--fail); }} .tag.muted {{ color: var(--quiet); }}
+.swatches {{ display:grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }}
+.swatch {{ margin:0; }}
+.chip {{ height: 96px; border-radius: 10px; display:flex; align-items:flex-end; padding: 10px; font: 500 12px var(--mono); border:1px solid rgba(127,127,127,.25); }}
+.swatch figcaption {{ display:grid; gap: 2px; margin-top: 8px; font-size: 14px; }}
+.swatch figcaption code {{ background:none; padding:0; color: var(--quiet); font-size:12px; }}
+.swatch small {{ color: var(--quiet); font-size: 12.5px; line-height: 1.4; }}
+.new {{ font: 500 10px var(--mono); text-transform: uppercase; letter-spacing:.08em; color: var(--accent); margin-left: 6px; }}
+table {{ width:100%; border-collapse: collapse; font-size: 14.5px; }}
+th, td {{ text-align:left; padding: 10px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }}
+th {{ font: 500 11.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--quiet); }}
+td.num {{ font-family: var(--mono); font-variant-numeric: tabular-nums; }}
+.pair {{ display:inline-flex; width: 44px; height: 30px; align-items:center; justify-content:center; border-radius: 6px; font: 600 15px var(--sans); border:1px solid rgba(127,127,127,.25); }}
+.scroll {{ overflow-x:auto; }}
+.misuse {{ margin:0; }}
+.misuse .tile {{ min-height: 140px; }}
+.misuse figcaption {{ font-size: 14px; margin-top: 10px; display:flex; gap:8px; }}
+.x {{ color: var(--fail); font: 600 16px/1.2 var(--sans); }}
+.clear {{ display:inline-block; padding: {n(clear)}px; outline: 1.5px dashed var(--accent); outline-offset: -1px;
+  background: repeating-linear-gradient(45deg, transparent 0 6px, color-mix(in srgb, var(--accent) 10%, transparent) 6px 7px); }}
+.clear > * {{ background: var(--bg); }}
+.typescale > div {{ display:grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--rule); }}
+.typescale .spec {{ font: 500 12px/1.5 var(--mono); color: var(--quiet); }}
+@media (max-width: 560px) {{ .typescale > div {{ grid-template-columns: 1fr; gap: 4px; }} }}
+.icons {{ display:flex; flex-wrap: wrap; gap: 14px; }}
+.icon {{ margin:0; width: 104px; padding: 18px 0 12px; border:1px solid var(--rule); border-radius: 12px; display:flex; flex-direction:column; align-items:center; gap: 8px; }}
+.icon svg {{ color: var(--text); }}
+.icon figcaption {{ font: 500 12px var(--mono); color: var(--quiet); }}
+.dodont {{ display:grid; gap: 12px; }}
+.dd {{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
+@media (max-width: 640px) {{ .dd {{ grid-template-columns: 1fr; }} }}
+.dd > div {{ border-radius: 10px; padding: 14px 16px; border:1px solid var(--rule); font-size: 15px; }}
+.dd .no {{ border-left: 3px solid var(--fail); }}
+.dd .yes {{ border-left: 3px solid var(--pass); background: var(--surface); }}
+.dd b {{ display:block; font: 500 11px var(--mono); letter-spacing:.08em; text-transform: uppercase; margin-bottom: 4px; }}
+.dd .no b {{ color: var(--fail); }} .dd .yes b {{ color: var(--pass); }}
+ul.rules {{ padding-left: 0; list-style: none; margin: 0; }}
+ul.rules li {{ padding: 10px 0 10px 26px; border-bottom: 1px solid var(--rule); position: relative; max-width: 72ch; }}
+ul.rules li::before {{ content:""; position:absolute; left:2px; top: 17px; width: 10px; height: 10px; background: var(--accent);
+  clip-path: path("M0.5 9.5A9 9 0 0 1 9.5 0.5A9 9 0 0 1 0.5 9.5Z"); }}
+ul.rules.never li::before {{ background: var(--fail); clip-path: none; width: 10px; height: 2px; top: 22px; }}
+.quote {{ font: 500 italic 26px/1.3 var(--serif); color: var(--text); border-left: 2px solid var(--accent); padding: 4px 0 4px 18px; max-width: 40ch; }}
+.pairing {{ background: var(--anduin-night); border-radius: 16px; padding: 24px; border: 1px solid #22323A; }}
+.minis {{ display:flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; }}
+.minis figure {{ margin: 0; }}
+footer {{ margin-top: 120px; padding-top: 24px; border-top: 1px solid var(--rule); color: var(--quiet); font-size: 14px; }}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  {pic("lembas-horizontal", "Lembas", 132)}
+  <nav aria-label="Sections"><a href="#idea">Idea</a><a href="#logo">Logo</a><a href="#colour">Colour</a><a href="#type">Type</a><a href="#icons">Icons</a><a href="#ithildin">Ithildin</a><a href="#voice">Voice</a><a href="#tolkien">References</a><a href="#assets">Assets</a></nav>
+</header>
+
+<div class="hero">
+  <div class="eyebrow">Brand guidelines · v1.0</div>
+  <h1>Light, exact,<br>made to last.</h1>
+  <p class="lead">Lembas is a pair of Claude skills for engineers. Lembas makes answers short and dense; Ithildin reads long documents by mapping them first. This page is how the brand looks and speaks. It tries to practise what the product does: every section carries something you need.</p>
+</div>
+
+<section id="idea">
+  <div class="eyebrow">01 · The idea</div>
+  <h2>Elven craftsmanship, applied to engineering</h2>
+  <p>The elves of Lórien made things that were light, exact and made to last, with nothing wasted. One wafer of their waybread fed a traveller for a day. Lembas promises the same in an answer: the problem, the exact fix, the alternatives and why the fix wins, in the smallest form that still holds all four.</p>
+  <h3>Personality, in order</h3>
+  <div class="grid g4" style="margin-top:10px">
+    <div><b>Precise.</b> <span style="color:var(--quiet)">A staff engineer's code review, not a fantasy poster.</span></div>
+    <div><b>Quietly mythic.</b> <span style="color:var(--quiet)">Felt before it is noticed. A stranger to the books sees a premium tool.</span></div>
+    <div><b>Economical.</b> <span style="color:var(--quiet)">No ornament that doesn't carry meaning.</span></div>
+    <div><b>Trustworthy.</b> <span style="color:var(--quiet)">Numbers with their method. The voice never oversells.</span></div>
+  </div>
+  <p style="margin-top:22px"><b>The test for every decision:</b> would it look at home on the Linear or Stripe website, and would a Tolkien reader recognise the reference? Both answers must be yes.</p>
+
+  <h3 style="margin-top:40px">Three directions</h3>
+  <div class="grid g3">{concept_html}</div>
+</section>
+
+<section id="logo">
+  <div class="eyebrow">02 · Logo</div>
+  <h2>The folded leaf</h2>
+  <p>Two circles of radius 42, centred on opposite corners of a 48-unit grid. Their overlap is the leaf; a straight break of 3 units, one sixteenth of the grid, splits it along the midrib. Nothing in the mark is drawn by eye.</p>
+  <img src="logo/lembas-mark-construction.svg" alt="Construction of the Lembas mark on a 48-unit grid" width="1020" style="border-radius:14px;margin-top:20px">
+
+  <h3 style="margin-top:44px">Lockups</h3>
+  <div class="grid g3">
+    <div><div class="tile light"><img src="logo/lembas-horizontal-color.svg" alt="Horizontal lockup" width="220"></div><div class="cap">Horizontal · default</div></div>
+    <div><div class="tile light"><img src="logo/lembas-stacked-color.svg" alt="Stacked lockup" width="130"></div><div class="cap">Stacked · square spaces</div></div>
+    <div><div class="tile light"><img src="logo/lembas-mark-color.svg" alt="Mark only" width="90"></div><div class="cap">Mark only · avatars, favicons</div></div>
+    <div><div class="tile dark"><img src="logo/lembas-horizontal-color-dark.svg" alt="Horizontal lockup on dark" width="220"></div><div class="cap">Full colour on Anduin Night</div></div>
+    <div><div class="tile white"><img src="logo/lembas-horizontal-black.svg" alt="One-colour black" width="220"></div><div class="cap">One colour · black</div></div>
+    <div><div class="tile black"><img src="logo/lembas-horizontal-white.svg" alt="One-colour white" width="220"></div><div class="cap">One colour · white</div></div>
+  </div>
+
+  <h3 style="margin-top:44px">The wordmark</h3>
+  <p>Cormorant Garamond SemiBold, tracked −0.008 em, with L–e closed up a further 0.03 em. It carries one detail: the counter of the <i>a</i> is a leaf at the mark's 45°. At text sizes it is an ordinary <i>a</i>; at display sizes it is the leaf. Always use the outlined file, never retype the name.</p>
+  <div class="tile light" style="margin-top:14px"><img src="logo/lembas-wordmark-color.svg" alt="Lembas wordmark" width="560"></div>
+
+  <h3 style="margin-top:44px">Clear space</h3>
+  <p>Keep clear space equal to the cap height of the <i>L</i> on every side of a lockup. For the mark alone, the 48-unit box already includes it: never crop inside the box.</p>
+  <div class="tile light" style="margin-top:14px"><div class="clear"><img src="logo/lembas-horizontal-color.svg" alt="Lockup with clear space" width="{show_w}"></div></div>
+
+  <h3 style="margin-top:44px">Minimum sizes</h3>
+  <p>Below 32 px, use the small mark: the leaf is drawn 20% larger and the break 50% heavier, so the break stays a full pixel wide at 16 px.</p>
+  <div class="tile light minis" style="justify-content:flex-start;gap:36px">
+    <figure><img src="logo/lembas-mark-small-color.svg" alt="" width="16" height="16"><div class="cap">Small mark · 16 px</div></figure>
+    <figure><img src="logo/lembas-mark-color.svg" alt="" width="32" height="32"><div class="cap">Mark · 32 px and up</div></figure>
+    <figure><img src="logo/lembas-horizontal-color.svg" alt="" width="96"><div class="cap">Horizontal · 96 px wide</div></figure>
+    <figure><img src="logo/lembas-stacked-color.svg" alt="" width="64"><div class="cap">Stacked · 64 px wide</div></figure>
+  </div>
+
+  <h3 style="margin-top:44px">Misuse</h3>
+  <div class="grid g4">{misuse()}</div>
+</section>
+
+<section id="colour">
+  <div class="eyebrow">03 · Colour</div>
+  <h2>Lothlórien at dusk</h2>
+  <p>Most surfaces are Waybread or Anduin Night. Gold is gilding: the mark, one number, one rule. If a screen has more than about 5% gold, remove some.</p>
+  <p>The seven starting colours are unchanged. Six were added because the originals fail as text on the opposite ground: Mallorn Gold is 2.04:1 on Waybread, so text and marks on light use <b>Gilt</b>; Lórien Green is 2.45:1 on Night, so green on dark uses <b>Lórien Leaf</b>; Ithildin vanishes on Waybread, so the sub-brand uses <b>Starlight</b> on light.</p>
+  <div class="swatches" style="margin-top:24px">{swatches()}</div>
+
+  <h3 style="margin-top:44px">Contrast, light surfaces</h3>
+  <div class="scroll"><table><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>WCAG</th></tr></thead><tbody>{contrast_rows(LIGHT_PAIRS)}</tbody></table></div>
+  <h3 style="margin-top:32px">Contrast, dark surfaces</h3>
+  <div class="scroll"><table><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>WCAG</th></tr></thead><tbody>{contrast_rows(DARK_PAIRS)}</tbody></table></div>
+  <h3 style="margin-top:32px">Never for text</h3>
+  <div class="scroll"><table><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Use</th></tr></thead><tbody>{contrast_rows(NEVER_PAIRS, False)}</tbody></table></div>
+  <p style="margin-top:12px;color:var(--quiet);font-size:14px">AA needs 4.5:1 for body text and 3:1 for large text (24 px, or 18.7 px bold). Ratios are computed from the hex values with the WCAG 2.2 formula.</p>
+</section>
+
+<section id="type">
+  <div class="eyebrow">04 · Type</div>
+  <h2>Carved, then clean</h2>
+  <p>Three open-licence families (SIL OFL), all on Google Fonts and copied into <code>brand/fonts/</code>. The serif is for names and numbers, the sans does the work, and the mono is for anything a user might type.</p>
+  <div class="typescale" style="margin-top:20px">
+    <div><div class="spec">Display XL<br>Cormorant 600 · 64/1.05</div><div style="font:600 64px/1.05 var(--serif);letter-spacing:-.01em">Waybread</div></div>
+    <div><div class="spec">Display L<br>Cormorant 600 · 44/1.1</div><div style="font:600 44px/1.1 var(--serif)">One bite is enough</div></div>
+    <div><div class="spec">Number<br>Cormorant 600 · lining</div><div style="font:600 44px/1.1 var(--serif);font-variant-numeric:lining-nums;color:var(--accent)">61–62%</div></div>
+    <div><div class="spec">Heading<br>Inter 600 · 20/1.3</div><div style="font:600 20px/1.3 var(--sans)">Reading large outputs</div></div>
+    <div><div class="spec">Body<br>Inter 400 · 16/1.6</div><div>Cron runs jobs with a minimal environment, so <code>python3</code> from pyenv and any relative path fail, and cron discards the error.</div></div>
+    <div><div class="spec">Small<br>Inter 400 · 14/1.5</div><div style="font-size:14px;color:var(--quiet)">Caveman's 10 developer questions, 2 runs, Claude Opus 5.5.</div></div>
+    <div><div class="spec">Code<br>JetBrains Mono 400 · 14/1.6</div><div><code>npm test 2&gt;&amp;1 | python3 scripts/squeeze.py</code></div></div>
+    <div><div class="spec">Label<br>JetBrains Mono 500 · 12 · +0.1 em caps</div><div class="eyebrow" style="margin:0">01 · Problem</div></div>
+  </div>
+  <ul class="rules" style="margin-top:22px">
+    <li>Cormorant only at 24 px and above. Its hairlines break up below that.</li>
+    <li>Use lining figures for numbers in Cormorant (<code>font-variant-numeric: lining-nums</code>). Its default old-style figures drop the 9 below the line.</li>
+    <li>Never set body copy, UI or code in the serif. Never set the wordmark in the sans.</li>
+  </ul>
+</section>
+
+<section id="icons">
+  <div class="eyebrow">05 · Iconography</div>
+  <h2>Line, on a grid</h2>
+  <p>24-unit grid, 1.5 stroke, round caps and joins, no fills except a single highlighted band. Diagonals run at 45°, the leaf's angle. Icons describe an action (squeeze, map, find, read, cite); they are never decorative.</p>
+  <div class="icons" style="margin-top:18px">{icons()}</div>
+</section>
+
+<section id="ithildin">
+  <div class="eyebrow">06 · Ithildin</div>
+  <h2>The waybread and the moon-letters</h2>
+  <p>Ithildin is the silver script on the Doors of Durin, visible only where moonlight falls on it. The skill reads long documents the same way: it maps the whole, then lights up only the sections a question needs.</p>
+  <p>The two marks are one leaf drawn two ways. Lembas is solid gold: substance, compressed. Ithildin is the same leaf in silver line, with its veins showing: structure, revealed. Lembas's break and Ithildin's midrib sit on the same line, so each mark is the other's negative. The Ithildin wordmark's one detail is the dot of its last <i>i</i>, drawn as a star.</p>
+  <div class="pairing" style="margin-top:20px"><img src="logo/lembas-ithildin-pair.svg" alt="Lembas and Ithildin lockups side by side" width="1000"></div>
+  <div class="grid g4" style="margin-top:20px">
+    <div><div class="tile dark"><img src="logo/ithildin-mark-color-dark.svg" alt="" width="96"></div><div class="cap">Ithildin on Night</div></div>
+    <div><div class="tile light"><img src="logo/ithildin-mark-color.svg" alt="" width="96"></div><div class="cap">Starlight on Waybread</div></div>
+    <div><div class="tile white"><img src="logo/ithildin-mark-black.svg" alt="" width="96"></div><div class="cap">One colour</div></div>
+    <div><div class="tile dark"><img src="logo/ithildin-mark-small-color-dark.svg" alt="" width="32"></div><div class="cap">Small mark · veins drop below 32 px</div></div>
+  </div>
+  <ul class="rules" style="margin-top:22px">
+    <li>Silver for Ithildin, gold for Lembas. Never swap them, never mix them in one mark.</li>
+    <li>Ithildin may glow on dark, once per surface: a soft light behind the mark, never on text.</li>
+    <li>When the two appear together, Lembas comes first, and both are the same size.</li>
+  </ul>
+</section>
+
+<section id="voice">
+  <div class="eyebrow">07 · Voice and tone</div>
+  <h2>Plain, exact, no hype</h2>
+  <p>The brand speaks the way the skill answers: the cause, the fix, the condition, the number. Full sentences. No exclamation marks, emoji, superlatives or promises a benchmark doesn't back.</p>
+  <div class="dodont" style="margin-top:20px">
+    <div class="dd"><div class="no"><b>Don't</b>Supercharge your AI with blazing-fast, magical answers! 🚀</div><div class="yes"><b>Do</b>Replies are 61–62% shorter than Claude with no prompt. 19 of 20 were complete in blind review.</div></div>
+    <div class="dd"><div class="no"><b>Don't</b>Lembas is the ultimate cure for token bloat.</div><div class="yes"><b>Do</b>Lembas cuts setup, recaps and offers of help. It never cuts code, numbers or warnings.</div></div>
+    <div class="dd"><div class="no"><b>Don't</b>Fear not, traveller! The elves have blessed thy logs.</div><div class="yes"><b>Do</b>squeeze.py keeps every error, warning and stack trace, and collapses repeated lines.</div></div>
+    <div class="dd"><div class="no"><b>Don't</b>Works perfectly, every time.</div><div class="yes"><b>Do</b>One answer in 20 still had a factual error. Method and data are in docs/BENCHMARKS.md.</div></div>
+    <div class="dd"><div class="no"><b>Don't</b>Oops! Something went wrong 😅</div><div class="yes"><b>Do</b>squeeze.py: input is binary (PNG). Pass a text log, JSON or CSV.</div></div>
+  </div>
+
+  <h3 style="margin-top:40px">One flourish per surface</h3>
+  <p>Each surface (a page, a release note, a card) may carry one line or title with a Tolkien echo. It must still make sense to someone who hasn't read the books.</p>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="quote">Not all who wander are lost, but their logs usually are.</div>
+    <div class="quote">Light where you need it.<br><span style="font-size:16px;font-family:var(--sans);font-style:normal;color:var(--quiet)">Ithildin, docs header</span></div>
+  </div>
+  <p style="margin-top:18px">Sanctioned section titles: <b>Provisions</b> (install), <b>Waymarks</b> (docs navigation), <b>Read by moonlight</b> (Ithildin's read step). Use one, not all three on the same page.</p>
+</section>
+
+<section id="tolkien">
+  <div class="eyebrow">08 · Tolkien references</div>
+  <h2>Felt before noticed</h2>
+  <ul class="rules">
+    <li>Draw from ideas in the books (waybread, mallorn leaves, moon-letters, the craft of Lórien), never from any film or game adaptation.</li>
+    <li>Name things after objects and ideas, not characters or places a reader would need to know.</li>
+    <li>At most one reference per surface, and it must still work for a reader who doesn't know the source.</li>
+    <li>Quote no more than a few words of the books verbatim. Paraphrase, or riff as in the flourish above.</li>
+    <li>Say plainly where the name comes from, once: "The name comes from <i>The Lord of the Rings</i>." Imply no endorsement.</li>
+  </ul>
+  <h3 style="margin-top:28px">Never</h3>
+  <ul class="rules never">
+    <li>Film stills, film or studio logos, or lettering that imitates the film title treatment, including fan fonts that copy it (Ringbearer, Aniron).</li>
+    <li>The One Ring inscription, maps of Middle-earth, or the likeness of any character.</li>
+    <li>Tengwar as body text or texture. Version 1 uses none; a future single-glyph accent needs checking by someone who reads it.</li>
+    <li>Parchment backgrounds, dragons, swords, Celtic knots, blackletter, or runes glowing on every surface.</li>
+  </ul>
+</section>
+
+<section id="assets">
+  <div class="eyebrow">09 · Applications and assets</div>
+  <h2>Where it lives</h2>
+  <div class="grid g2" style="margin-top:12px">
+    <div><img src="social/og-image.png" alt="Social preview card" width="640" style="border-radius:12px;border:1px solid var(--rule)"><div class="cap">social/og-image.png · 1280×640 · GitHub social preview</div></div>
+    <div><picture><source media="(prefers-color-scheme: dark)" srcset="readme/hero-dark.svg"><img src="readme/hero-light.svg" alt="README hero banner" width="640"></picture><div class="cap">readme/hero-light.svg and hero-dark.svg</div></div>
+  </div>
+  <h3 style="margin-top:32px">README hero</h3>
+  <pre><code>&lt;picture&gt;
+  &lt;source media="(prefers-color-scheme: dark)" srcset="brand/readme/hero-dark.svg"&gt;
+  &lt;source media="(prefers-color-scheme: light)" srcset="brand/readme/hero-light.svg"&gt;
+  &lt;img alt="Lembas: a Claude skill for short, dense engineering answers." src="brand/readme/hero-light.svg" width="100%"&gt;
+&lt;/picture&gt;</code></pre>
+  <h3 style="margin-top:28px">Badges</h3>
+  <p>Shields.io always draws badge text in white, so badge values use Gilt, Lórien Green and Starlight only. Ready-to-paste Markdown is in <a href="badges.md">badges.md</a>.</p>
+  <pre><code>[![Release](https://img.shields.io/github/v/release/jmjohns9/lembas?style=flat-square&amp;labelColor=0E1719&amp;color=7D5F16)](https://github.com/jmjohns9/lembas/releases/latest)</code></pre>
+  <h3 style="margin-top:28px">Files</h3>
+  <div class="scroll"><table>
+    <tr><td><code>logo/</code></td><td>Marks, wordmarks and lockups for Lembas and Ithildin in <code>color</code>, <code>color-dark</code>, <code>black</code> and <code>white</code>; small marks for 32 px and below; construction diagram; family pair</td></tr>
+    <tr><td><code>icons/</code></td><td>favicon.svg and .ico (16, 32, 48), apple-touch-icon-180.png, icon-512.png, github-avatar-500.png</td></tr>
+    <tr><td><code>social/</code></td><td>og-image.svg and .png</td></tr>
+    <tr><td><code>readme/</code></td><td>hero-light.svg, hero-dark.svg, README-snippet.md</td></tr>
+    <tr><td><code>concepts/</code></td><td>The three explored directions</td></tr>
+    <tr><td><code>fonts/</code></td><td>Static instances of the three families with their OFL licences</td></tr>
+    <tr><td><code>_build/</code></td><td>The Python that generates every file above. Change a value there, not in an SVG.</td></tr>
+  </table></div>
+</section>
+
+<footer>Lembas brand guidelines v1.0 · Fonts under the SIL Open Font License · Inspired by the books' ideas; not affiliated with the Tolkien Estate or Middle-earth Enterprises.</footer>
+</main>
+</body>
+</html>
+"""
+    write("guidelines.html", html)
+    print("guidelines ok")
+
+
+if __name__ == "__main__":
+    build()
