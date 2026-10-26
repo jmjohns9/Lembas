@@ -17,4 +17,5 @@ python3 -m venv .venv && .venv/bin/pip install fonttools uharfbuzz resvg-py pill
 | `banners.py` | `social/og-image.*`, `readme/hero-*.svg` |
 | `guidelines.py` | `guidelines.html`, with contrast ratios computed from the palette |
 | `overview.py` | `overview.png`: the identity on one board |
+| `kit.py` | `kit/lembas-brandkit.svg/.png`: the 3×3 brand-kit board |
 | `review.py` | `previews/`: PNG renders and contact sheets for checking |
