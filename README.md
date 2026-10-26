@@ -1,8 +1,12 @@
-# Lembas
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/readme/hero-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="brand/readme/hero-light.svg">
+  <img alt="Lembas: a Claude skill for short, dense engineering answers. Every reply carries the problem, the exact fix, the alternatives and why the fix wins." src="brand/readme/hero-light.svg" width="100%">
+</picture>
 
 [![Checks](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml/badge.svg)](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml)
-[![Release](https://img.shields.io/github/v/release/jmjohns9/lembas)](https://github.com/jmjohns9/lembas/releases/latest)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/jmjohns9/lembas?style=flat-square&labelColor=0E1719&color=7D5F16)](https://github.com/jmjohns9/lembas/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache%202.0-3E5C47?style=flat-square&labelColor=0E1719)](LICENSE)
 
 **A Claude skill for short, dense engineering answers: the problem, the fix, the alternatives and why the fix wins.**
 
