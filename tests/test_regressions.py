@@ -136,7 +136,6 @@ class I02_OutputIsUtf8WhateverTheTerminalEncoding(unittest.TestCase):
                 self.assertIn("104 °C", stdout.decode("utf-8"))
 
 
-@pending("test_library_call_does_not_raise", "test_piped_input_still_produces_output")
 class I07_DeeplyNestedJsonDoesNotCrash(unittest.TestCase):
     DEEP = "[" * 100000 + "]" * 100000
 

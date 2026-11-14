@@ -137,7 +137,7 @@ def detect(text, name=None):
         try:
             json.loads(stripped)
             return "json"
-        except ValueError:
+        except (ValueError, RecursionError):      # not JSON, or nested too deeply to parse
             pass
     lines = text.split("\n")
     head = [l for l in lines[:50] if l.strip()]
@@ -769,7 +769,11 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
     if before <= threshold:
         return None, info
     if kind == "auto":
-        kind = detect(text, name)
+        try:
+            kind = detect(text, name)
+        except Exception as exc:  # detection is a guess; a failure here must not lose the output
+            info["error"] = repr(exc)
+            kind = "text"
         info["kind"] = kind
         if kind not in DATA_TYPES and before <= hard_cap:
             return None, info
