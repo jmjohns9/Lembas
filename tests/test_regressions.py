@@ -261,7 +261,6 @@ class I22_TrueIsNotTheNumberOne(unittest.TestCase):
         self.assertEqual(squeeze._field_summary([False, 0, False], 3, 40), "bool/num, 3/3, false×2, 0×1")
 
 
-@pending(*(["test_sum_is_the_same_on_every_python_version"] if sys.version_info < (3, 12) else []))
 class I23_ColumnSumsAreCorrectlyRounded(unittest.TestCase):
     def test_sum_is_the_same_on_every_python_version(self):
         # Plain sum() adds left to right before Python 3.12 and gives 2 here; from 3.12 it compensates

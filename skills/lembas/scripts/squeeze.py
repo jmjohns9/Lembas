@@ -26,6 +26,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import statistics
@@ -633,8 +634,11 @@ def _profile_column(vals, line_nos, str_len):
         if unique and kind == "int" and len(p) > 20:
             summary = f"{fmt(lo)}…{fmt(hi)}, unique (likely an ID)"
         else:
+            # fsum is correctly rounded. Plain sum() on floats is only accurate from Python 3.12, so
+            # using it would make the same file print different totals on different versions.
+            total = sum(nums) if kind == "int" else math.fsum(nums)
             summary = (f"min {fmt(lo)}, max {fmt(hi)}, mean {fmt(statistics.fmean(nums))}, "
-                       f"median {fmt(statistics.median(nums))}, sum {fmt(sum(nums))}")
+                       f"median {fmt(statistics.median(nums))}, sum {fmt(total)}")
             if len(distinct) <= 6:
                 summary = ", ".join(f"{v}×{c}" for v, c in distinct.most_common()) + "; " + summary
             # Flag a value only when it is far from everything else (a shifted decimal, a sentinel
