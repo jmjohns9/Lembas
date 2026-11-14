@@ -435,12 +435,6 @@ class I10_UnsupportedFilesAreRefused(unittest.TestCase):
             self.assertEqual(len(doc.lines), 2)
 
 
-@pending("test_corrupt_pdf",
-         "test_files_that_are_not_really_word_or_powerpoint",
-         "test_invalid_regular_expression",
-         "test_non_numeric_map_budget_in_the_environment",
-         "test_reading_from_an_empty_document",
-         "test_a_pdftotext_timeout_falls_back_to_pypdf")
 class I11_BadInputGetsAMessageNotATraceback(unittest.TestCase):
     def test_corrupt_pdf(self):
         path = support.tmp("regressions", "i11", "bad.pdf")

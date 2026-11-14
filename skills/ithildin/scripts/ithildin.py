@@ -19,6 +19,8 @@ import hashlib
 import html
 import html.parser
 import json
+import logging
+import math
 import os
 import posixpath
 import re
@@ -77,22 +79,34 @@ def _run(cmd, timeout=180):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
+def _pdf_reader(path):
+    """pypdf's reader for `path`. Raises ImportError when pypdf is not installed."""
+    from pypdf import PdfReader
+    # pypdf logs a warning for each oddity in a damaged file; printed, they would end up in Claude's context.
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    return PdfReader(path)
+
+
 def extract_pdf(path):
     doc = Doc(path, "PDF")
     pages = None
     if shutil.which("pdftotext"):
-        r = _run(["pdftotext", "-enc", "UTF-8", path, "-"])
-        if r.returncode == 0:
+        try:
+            r = _run(["pdftotext", "-enc", "UTF-8", path, "-"])
+        except (subprocess.TimeoutExpired, OSError):
+            r = None                    # fall back to pypdf, as for a failed run
+        if r is not None and r.returncode == 0:
             pages = r.stdout.split("\f")
             if pages and not pages[-1].strip():
                 pages = pages[:-1]
     if pages is None:
         try:
-            from pypdf import PdfReader
+            reader = _pdf_reader(path)
+            pages = [(p.extract_text() or "") for p in reader.pages]
         except ImportError:
             sys.exit("ithildin: reading PDF needs pdftotext (poppler-utils) or `pip install pypdf`.")
-        reader = PdfReader(path)
-        pages = [(p.extract_text() or "") for p in reader.pages]
+        except Exception as exc:
+            sys.exit(f"ithildin: {os.path.basename(path)} could not be read as a PDF ({exc.__class__.__name__}: {exc}).")
     doc.pages = len(pages)
     for i, text in enumerate(pages, 1):
         for line in text.splitlines():
@@ -114,13 +128,8 @@ def _pdf_font_headings(doc, max_pages=2000):
     if doc.pages > max_pages:
         return
     try:
-        from pypdf import PdfReader
-        import math
-    except ImportError:
-        return
-    try:
-        reader = PdfReader(doc.path)
-    except Exception:
+        reader = _pdf_reader(doc.path)
+    except Exception:      # pypdf is not installed, or the file is damaged
         return
     runs = []          # (page, size, text)
     sizes = {}
@@ -223,13 +232,9 @@ def _strip_running_lines(doc):
 
 def _pdf_outline(doc):
     try:
-        from pypdf import PdfReader
-    except ImportError:
-        return
-    try:
-        reader = PdfReader(doc.path)
+        reader = _pdf_reader(doc.path)
         outline = reader.outline
-    except Exception:
+    except Exception:      # pypdf is not installed, or the file is damaged
         return
     found = []
 
@@ -675,6 +680,14 @@ def cache_dir():
     return d
 
 
+def _office(extract, path, kind):
+    """Read a Word or PowerPoint file, or exit with a message if it is not really one."""
+    try:
+        return extract(path)
+    except (zipfile.BadZipFile, KeyError, ET.ParseError, ValueError, TypeError, AttributeError) as exc:
+        sys.exit(f"ithildin: {os.path.basename(path)} is not a valid {kind} file ({exc.__class__.__name__}: {exc}).")
+
+
 def load(path):
     if not os.path.isfile(path):
         sys.exit(f"ithildin: no such file: {path}")
@@ -699,9 +712,9 @@ def load(path):
     if ext == ".pdf":
         doc = extract_pdf(path)
     elif ext in (".docx", ".docm"):
-        doc = extract_docx(path)
+        doc = _office(extract_docx, path, "Word")
     elif ext == ".pptx":
-        doc = extract_pptx(path)
+        doc = _office(extract_pptx, path, "PowerPoint")
     elif ext in (".md", ".markdown", ".mdx"):
         doc = extract_markdown(path)
     elif ext in (".html", ".htm", ".xhtml"):
@@ -846,6 +859,8 @@ def _label(h):
 
 
 def resolve(doc, target):
+    if not doc.lines:
+        sys.exit("ithildin: this document has no text to read.")
     t = target.strip()
     m = re.match(r"^[pP](\d+)(?:\s*-\s*[pP]?(\d+))?$", t)
     if m:
@@ -908,7 +923,12 @@ def render_read(doc, targets, max_tokens):
 
 def render_find(doc, patterns, regex, limit, context):
     flags = re.I
-    compiled = [(p, re.compile(p if regex else re.escape(p), flags)) for p in patterns]
+    compiled = []
+    for p in patterns:
+        try:
+            compiled.append((p, re.compile(p if regex else re.escape(p), flags)))
+        except re.error as exc:
+            sys.exit(f"ithildin: invalid regular expression {p!r}: {exc}. Drop --regex to search for it as plain text.")
     out = []
     summary = []
     for label, rx in compiled:
@@ -1002,6 +1022,18 @@ def render_table(doc, tid):
     sys.exit("ithildin: no rows stored for this table.")
 
 
+def _env_int(name, default):
+    """A whole-number setting from the environment; a bad value is reported and the default used."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        sys.stderr.write(f"ithildin: {name}={raw!r} is not a whole number; using {default}.\n")
+        return default
+
+
 def _write(stream, text):
     """Write text as UTF-8, whatever encoding the terminal reports.
 
@@ -1022,7 +1054,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     m = sub.add_parser("map", help="outline, page ranges, gists, tables, terms")
     m.add_argument("file")
-    m.add_argument("--budget", type=int, default=int(os.environ.get("ITHILDIN_MAP_BUDGET", DEFAULT_MAP_BUDGET)))
+    m.add_argument("--budget", type=int, default=_env_int("ITHILDIN_MAP_BUDGET", DEFAULT_MAP_BUDGET))
     m.add_argument("--depth", type=int)
     f = sub.add_parser("find", help="search; several patterns in one call")
     f.add_argument("file")
