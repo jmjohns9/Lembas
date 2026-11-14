@@ -20,6 +20,7 @@ import html
 import html.parser
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -352,13 +353,37 @@ def _add_table(doc, rows, page=None):
 
 
 P = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+PML = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+
+def _slide_order(z, names):
+    """Slide parts in the order the deck shows them.
+
+    PowerPoint records that order in ppt/presentation.xml and does not rename slide files when a
+    slide is moved, so the numbers in the file names only say when each slide was created.
+    Slides the list leaves out, and decks with no list, fall back to file-name order.
+    """
+    by_number = sorted(names, key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[1]).group(1)))
+    try:
+        rels = ET.fromstring(z.read("ppt/_rels/presentation.xml.rels"))
+        listed = ET.fromstring(z.read("ppt/presentation.xml")).iter(PML + "sldId")
+    except (KeyError, ET.ParseError):
+        return by_number
+    targets = {r.get("Id"): r.get("Target") or "" for r in rels}
+    ordered = []
+    for slide in listed:
+        target = targets.get(slide.get(REL_ID), "")
+        name = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join("ppt", target))
+        if name in names and name not in ordered:
+            ordered.append(name)
+    return ordered + [n for n in by_number if n not in ordered]
 
 
 def extract_pptx(path):
     doc = Doc(path, "PowerPoint deck")
     with zipfile.ZipFile(path) as z:
-        names = [n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)]
-        names.sort(key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[1]).group(1)))
+        names = _slide_order(z, [n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)])
         for i, name in enumerate(names, 1):
             root = ET.fromstring(z.read(name))
             title_done = False

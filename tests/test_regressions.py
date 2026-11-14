@@ -376,8 +376,6 @@ class I09_BadSettingsNeverBreakTheToolCall(unittest.TestCase):
 
 # ====================================================================== ithildin.py
 
-@pending("test_a_reordered_deck_is_numbered_as_it_is_shown",
-         "test_slides_the_order_list_leaves_out_are_kept_at_the_end")
 class I04_SlidesFollowThePresentationOrder(unittest.TestCase):
     SLIDES = [(f"Slide made {i}", [f"Body of slide made {i}."], None) for i in range(1, 6)]
 
