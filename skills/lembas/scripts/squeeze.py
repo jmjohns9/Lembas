@@ -745,17 +745,28 @@ HINTS = {
 }
 
 
-def save_original(text, kind, cache_dir=None):
+def _cache_path(text, kind, cache_dir=None):
+    """Where the original of `text` is kept. The name is a hash of the content, so it can be worked
+    out, and quoted in a summary, before anything is written."""
     cache_dir = cache_dir or os.environ.get("LEMBAS_SQUEEZE_DIR") or os.path.join(tempfile.gettempdir(), "lembas-squeeze")
-    # Command output can contain secrets, so the cache is readable by the current user only.
-    os.makedirs(cache_dir, mode=0o700, exist_ok=True)
     ext = {"log": ".log", "json": ".json", "jsonl": ".jsonl", "csv": ".csv"}.get(kind, ".txt")
-    path = os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
+    return os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
+
+
+def _store(text, path):
+    """Write `text` to `path` unless it is already there. Returns the path used."""
+    # Command output can contain secrets, so the cache is readable by the current user only.
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     if not os.path.exists(path):
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
     return path
+
+
+def save_original(text, kind, cache_dir=None):
+    """Keep the full text in the cache and return its path."""
+    return _store(text, _cache_path(text, kind, cache_dir))
 
 
 def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAULT_THRESHOLD,
@@ -807,22 +818,29 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
             kind = "text"
         except Exception:
             return None, info
-    if original_path:
-        path = original_path
-    else:
+    def with_header(path):
+        return (f"[lembas squeeze: {kind}, {facts}. ~{before:,} tokens shown as a summary. "
+                f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}. Lines marked L123 are original line numbers.]"
+                "\n" + body)
+
+    # Decide whether the summary is worth using before anything is written: output that is passed
+    # through needs no saved copy, and command output can hold secrets.
+    path = original_path or _cache_path(text, kind)
+    view = with_header(path)
+    info.update(kind=kind, after=est_tokens(view))
+    if info["after"] > before * (1 - MIN_SAVING):
+        return None, info
+    if not original_path:
         try:
-            path = save_original(text, kind)
+            saved = _store(text, path)
         except OSError as exc:
             # A summary must point at the full text. With nowhere to keep it, pass the input through.
             info["error"] = f"could not save the original: {exc!r}"
             return None, info
-    header = (f"[lembas squeeze: {kind}, {facts}. ~{before:,} tokens shown as a summary. "
-              f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}. Lines marked L123 are original line numbers.]")
-    view = header + "\n" + body
-    after = est_tokens(view)
-    info.update(kind=kind, after=after, path=path)
-    if after > before * (1 - MIN_SAVING):
-        return None, info
+        if saved != path:
+            path, view = saved, with_header(saved)
+            info["after"] = est_tokens(view)
+    info["path"] = path
     return view, info
 
 
@@ -866,8 +884,10 @@ def main(argv=None):
     _write(sys.stdout, out if out.endswith("\n") else out + "\n")
     if view is None and "error" in info:
         _write(sys.stderr, f"squeeze: {info['error']}; the input was printed unchanged\n")
-    if args.stats:
-        pct = 100 * (1 - info["after"] / info["before"]) if info["before"] else 0
+    if args.stats and view is None:
+        _write(sys.stderr, f"squeeze: {info['kind']}, ~{info['before']:,} tokens, passed through unchanged\n")
+    elif args.stats:
+        pct = 100 * (1 - info["after"] / info["before"])
         _write(sys.stderr, f"squeeze: {info['kind']}, ~{info['before']:,} → ~{info['after']:,} tokens ({pct:.0f}% smaller)\n")
     return 0
 

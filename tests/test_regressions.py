@@ -205,9 +205,6 @@ class I16_CurrencyWithThousandsSeparators(unittest.TestCase):
         self.assertIn(f"sum {sum(1000 + i + 0.5 for i in range(3000)):,.2f}", row)
 
 
-@pending("test_nothing_is_saved_for_output_that_is_passed_through",
-         "test_small_input_stats",
-         "test_library_info_has_no_saved_path_for_a_pass_through")
 class I17_PassThroughWritesNothingAndReportsHonestly(unittest.TestCase):
     def test_nothing_is_saved_for_output_that_is_passed_through(self):
         cache = support.tmp("regressions", "i17", "cache", "x")[:-2]
