@@ -598,6 +598,8 @@ def _num_value(s):
 
 
 def _numfmt(x):
+    if isinstance(x, int):
+        return f"{x:,}"                 # exact at any size; a float would round an 18-digit ID
     if x == int(x) and abs(x) < 1e15:
         return f"{x:,.0f}"
     return f"{x:,.2f}" if abs(x) >= 100 else f"{x:,.6g}"
@@ -623,7 +625,8 @@ def _profile_column(vals, line_nos, str_len):
     distinct = Counter(p)
     flags = []
     if kind in ("int", "float"):
-        nums = [_num_value(v) for v in p]
+        # Whole-number columns stay integers, so IDs and counts beyond 2**53 keep every digit.
+        nums = [int(v) for v in p] if kind == "int" else [_num_value(v) for v in p]
         lo, hi = min(nums), max(nums)
         fmt = _numfmt
         unique = len(distinct) == len(p)

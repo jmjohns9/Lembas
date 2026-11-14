@@ -238,7 +238,6 @@ class I20_UnreadableFileGetsAMessage(unittest.TestCase):
             self.assertEqual(stderr.count("\n"), 1)
 
 
-@pending("test_eighteen_digit_ids", "test_integer_statistics_are_exact")
 class I21_LargeIntegersKeepTheirDigits(unittest.TestCase):
     def test_eighteen_digit_ids(self):
         first = 123456789012345000
