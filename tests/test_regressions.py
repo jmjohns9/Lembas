@@ -189,7 +189,6 @@ class I08_ByteOrderMarkIsIgnored(unittest.TestCase):
         self.assertEqual(doc.lines[0][1], "Title")
 
 
-@pending("test_values", "test_a_money_column_is_profiled_as_numbers")
 class I16_CurrencyWithThousandsSeparators(unittest.TestCase):
     def test_values(self):
         cases = [("$1,234.56", 1234.56), ("€9,000", 9000.0), ("£12", 12.0), ("-$5.00", -5.0),
@@ -202,7 +201,9 @@ class I16_CurrencyWithThousandsSeparators(unittest.TestCase):
         view, _ = squeeze.squeeze(text, "prices.csv", original_path="prices.csv")
         row = next(l for l in view.split("\n") if l.strip().startswith("price "))
         self.assertIn("price (float)", row)
-        self.assertIn(f"sum {sum(1000 + i + 0.5 for i in range(3000)):,.2f}", row)
+        self.assertIn("min 1,000.50, max 3,999.50", row)
+        self.assertTrue(row.endswith("sum 7,500,000"), row)
+        self.assertEqual(sum(1000 + i + 0.5 for i in range(3000)), 7500000)
 
 
 class I17_PassThroughWritesNothingAndReportsHonestly(unittest.TestCase):

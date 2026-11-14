@@ -580,9 +580,20 @@ DATE_RE = re.compile(r"^\d{4}[-/]\d{2}[-/]\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?
 BOOL = {"true", "false", "yes", "no", "t", "f", "y", "n"}
 
 
+THOUSANDS_RE = re.compile(r"^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$")
+CURRENCY = "$€£"
+
+
 def _num_value(s):
-    s = s.strip().replace(",", "") if s.count(",") and re.match(r"^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$", s.strip()) else s.strip()
-    s = s.lstrip("$€£")
+    """The number a cell holds, or None. Accepts a currency symbol, a sign before it and thousands separators."""
+    s = s.strip()
+    sign = ""
+    if s[:1] in ("+", "-") and s[1:2] and s[1:2] in CURRENCY:      # -$5.00
+        sign, s = s[0], s[1:]
+    # The symbol comes off first, so that "$1,234.56" is seen as a number with separators.
+    s = sign + s.lstrip(CURRENCY).lstrip()
+    if "," in s and THOUSANDS_RE.match(s):
+        s = s.replace(",", "")
     return float(s) if FLOAT_RE.match(s) else None
 
 
