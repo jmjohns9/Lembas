@@ -110,9 +110,6 @@ class I01_PipedOutputSurvivesAnUnwritableCache(unittest.TestCase):
         self.assertTrue(stdout.decode("utf-8").startswith("[lembas squeeze: log"))
 
 
-@pending("test_squeeze_passes_through_text_the_terminal_encoding_cannot_represent",
-         "test_squeeze_summary_is_utf8",
-         "test_ithildin_output_is_utf8")
 class I02_OutputIsUtf8WhateverTheTerminalEncoding(unittest.TestCase):
     def test_squeeze_passes_through_text_the_terminal_encoding_cannot_represent(self):
         text = "deploy \U0001F680 done 你好\n" * 5

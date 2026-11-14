@@ -820,6 +820,21 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
     return view, info
 
 
+def _write(stream, text):
+    """Write text as UTF-8, whatever encoding the terminal reports.
+
+    The reader is Claude or a pipe into it, both of which expect UTF-8. Python would otherwise use
+    the system code page on Windows and fail on, or mis-encode, any character outside it.
+    """
+    raw = getattr(stream, "buffer", None)
+    if raw is None:                     # a text-only stream, such as io.StringIO in tests
+        stream.write(text)
+        return
+    stream.flush()
+    raw.write(text.encode("utf-8", "replace"))
+    raw.flush()
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Shrink large logs, JSON and CSV before an LLM reads them.")
     ap.add_argument("file", nargs="?", default="-")
@@ -842,12 +857,12 @@ def main(argv=None):
     hard_cap = 0 if args.type != "auto" else 40000
     view, info = squeeze(text, name, args.type, args.budget, args.threshold, original, hard_cap)
     out = view if view is not None else clean(text)
-    sys.stdout.write(out if out.endswith("\n") else out + "\n")
+    _write(sys.stdout, out if out.endswith("\n") else out + "\n")
     if view is None and "error" in info:
-        sys.stderr.write(f"squeeze: {info['error']}; the input was printed unchanged\n")
+        _write(sys.stderr, f"squeeze: {info['error']}; the input was printed unchanged\n")
     if args.stats:
         pct = 100 * (1 - info["after"] / info["before"]) if info["before"] else 0
-        sys.stderr.write(f"squeeze: {info['kind']}, ~{info['before']:,} → ~{info['after']:,} tokens ({pct:.0f}% smaller)\n")
+        _write(sys.stderr, f"squeeze: {info['kind']}, ~{info['before']:,} → ~{info['after']:,} tokens ({pct:.0f}% smaller)\n")
     return 0
 
 

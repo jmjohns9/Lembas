@@ -962,6 +962,21 @@ def render_table(doc, tid):
     sys.exit("ithildin: no rows stored for this table.")
 
 
+def _write(stream, text):
+    """Write text as UTF-8, whatever encoding the terminal reports.
+
+    The reader is Claude, which expects UTF-8. Python would otherwise use the system code page on
+    Windows and fail on, or mis-encode, any character in the document that lies outside it.
+    """
+    raw = getattr(stream, "buffer", None)
+    if raw is None:                     # a text-only stream, such as io.StringIO in tests
+        stream.write(text)
+        return
+    stream.flush()
+    raw.write(text.encode("utf-8", "replace"))
+    raw.flush()
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="ithildin.py", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -985,17 +1000,18 @@ def main(argv=None):
     sub.add_parser("version")
     args = ap.parse_args(argv)
     if args.cmd == "version":
-        print(VERSION)
+        _write(sys.stdout, VERSION + "\n")
         return
     doc = load(args.file)
     if args.cmd == "map":
-        print(render_map(doc, args.budget, args.depth))
+        view = render_map(doc, args.budget, args.depth)
     elif args.cmd == "find":
-        print(render_find(doc, args.patterns, args.regex, args.n, args.C))
+        view = render_find(doc, args.patterns, args.regex, args.n, args.C)
     elif args.cmd == "read":
-        print(render_read(doc, args.targets, args.max_tokens))
-    elif args.cmd == "table":
-        print(render_table(doc, args.table_id))
+        view = render_read(doc, args.targets, args.max_tokens)
+    else:
+        view = render_table(doc, args.table_id)
+    _write(sys.stdout, view + "\n")
 
 
 if __name__ == "__main__":
