@@ -894,13 +894,16 @@ def main(argv=None):
         raw = sys.stdin.buffer.read()
         name, original = None, None
     else:
-        with open(args.file, "rb") as fh:
-            raw = fh.read()
+        try:
+            with open(args.file, "rb") as fh:
+                raw = fh.read()
+        except OSError as exc:
+            _write(sys.stderr, f"squeeze: cannot read {args.file}: {exc.strerror or exc}\n")
+            return 2
         name, original = args.file, os.path.abspath(args.file)
     text = raw.decode("utf-8", "replace")
-    # A forced type means the caller asked for a summary, so skip the code and prose guard.
-    hard_cap = 0 if args.type != "auto" else 40000
-    view, info = squeeze(text, name, args.type, args.budget, args.threshold, original, hard_cap)
+    # A forced --type always gets a summary: squeeze() applies its code-and-prose guard only in auto mode.
+    view, info = squeeze(text, name, args.type, args.budget, args.threshold, original)
     out = view if view is not None else clean(text)
     _write(sys.stdout, out if out.endswith("\n") else out + "\n")
     if view is None and "error" in info:

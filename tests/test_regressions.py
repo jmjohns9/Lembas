@@ -226,7 +226,6 @@ class I17_PassThroughWritesNothingAndReportsHonestly(unittest.TestCase):
         self.assertNotIn("path", info)
 
 
-@pending("test_missing_file_and_folder")
 class I20_UnreadableFileGetsAMessage(unittest.TestCase):
     def test_missing_file_and_folder(self):
         for target in (support.tmp("regressions", "i20", "nope.log"), support.TMP):
