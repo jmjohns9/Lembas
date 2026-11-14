@@ -397,7 +397,6 @@ class I04_SlidesFollowThePresentationOrder(unittest.TestCase):
                          ["Slide made 3", "Slide made 1", "Slide made 2", "Slide made 4", "Slide made 5"])
 
 
-@pending("test_paragraphs_headings_and_tables_inside_content_controls", "test_document_order_is_kept")
 class I05_WordContentControlsAreRead(unittest.TestCase):
     def test_paragraphs_headings_and_tables_inside_content_controls(self):
         body = (support.w_sdt(support.w_p("1 Limits", style="Heading1"))

@@ -288,6 +288,20 @@ def _docx_text(el):
     return "".join(out)
 
 
+# Word wraps content controls (form fields, template placeholders, generated contents lists) and
+# custom XML in these elements. Their contents are ordinary document text.
+_DOCX_WRAPPERS = (W + "sdt", W + "sdtContent", W + "customXml")
+
+
+def _docx_children(parent, tags):
+    """Direct children of `parent` with one of `tags`, in document order, looking inside wrappers."""
+    for child in parent:
+        if child.tag in tags:
+            yield child
+        elif child.tag in _DOCX_WRAPPERS:
+            yield from _docx_children(child, tags)
+
+
 def extract_docx(path):
     doc = Doc(path, "Word document")
     with zipfile.ZipFile(path) as z:
@@ -300,7 +314,7 @@ def extract_docx(path):
                 lvl = st.find(f"{W}pPr/{W}outlineLvl")
                 styles[sid] = ((name.get(W + "val") if name is not None else sid) or "",
                                int(lvl.get(W + "val")) + 1 if lvl is not None else None)
-    for child in body:
+    for child in _docx_children(body, (W + "p", W + "tbl")):
         if child.tag == W + "p":
             text = norm(_docx_text(child))
             if not text:
