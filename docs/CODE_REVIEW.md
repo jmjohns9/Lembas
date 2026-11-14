@@ -10,8 +10,10 @@ Every finding below was reproduced by running the code, unless it is marked **no
 |---|---:|---:|---:|---:|
 | [Optimize](#2a-optimize) | 0 | 3 | 6 | 9 |
 | [Test](#2b-test) | 1 | 4 | 3 | 8 |
-| [Improve](#2c-improve) | 6 | 13 | 22 | 41 |
-| **Total** | **7** | **20** | **31** | **58** |
+| [Improve](#2c-improve) | 6 | 15 | 24 | 45 |
+| **Total** | **7** | **22** | **33** | **62** |
+
+Four of the Improve findings (I-42 to I-45) were found after the first review, while writing the unit tests. They are listed under [Found while writing tests](#found-while-writing-tests).
 
 The seven High findings:
 
@@ -308,6 +310,15 @@ Intentionally left uncovered:
 | I-39 | `scripts/grade.py:19-20`, `evals/generate_replies.py:26-27` | Two graders with different opener and closer rules. `grade.py`'s opener pattern has no word boundary, so a reply starting "Greater isolation…" is flagged as a greeting. | Share one definition; add the word boundary. |
 | I-40 | `brand/_build/icons.py:44-53`, `logo.py:199`, `guidelines.py:60`, `lib.py:208-213`, `run_all.py:4-5`, `kit.py:239` | Unused imports and variables, a loop whose body is `pass`, `write()` with no explicit encoding (non-ASCII text in files that declare UTF-8), a build that only works from its own folder, and a hard-coded `v2.1.0` badge. | Remove dead code, write UTF-8 explicitly, resolve paths from `__file__`. Confirm by rebuild that every SVG stays identical. |
 | I-41 | `.github/workflows/checks.yml:15,17` | Actions are referenced by tag (`@v4`, `@v5`), not by commit. | Pin to commit SHAs; a hygiene step, low risk for a repo with read-only token permissions. |
+
+### Found while writing tests
+
+| ID | Severity | Where | Problem | Fix |
+|---|---|---|---|---|
+| <a id="i-42"></a>I-42 | Low | `squeeze.py:181` | Python warning class names are not counted as warnings: `UserWarning: …` has severity 0, while `TypeError: …` counts as an error by its suffix. | Add the `…Warning` suffix to the warning pattern. |
+| <a id="i-43"></a>I-43 | Medium | `ithildin.py:192-220` | Running-header removal ignores digits so that "Page 12" matches "Page 13". A numbered heading that opens most pages ("1 Chapter 1", "2 Chapter 2", one chapter per page) looks like the same header and is deleted, so a PDF without bookmarks loses those sections. | **Not fixed in this branch.** A footer such as "12 Maintenance Manual" has the same shape as a heading, so any rule change needs checking against real books. Recorded as an expected-failure test. |
+| <a id="i-44"></a>I-44 | Medium | `ithildin.py:641-647` | The cache key is the file's bytes plus the script's code, not the file type. Two files with the same bytes and different extensions (`notes.md`, `notes.txt`) share an entry, so the second is given the first one's parse. | Include the lower-cased extension in the key. |
+| <a id="i-45"></a>I-45 | Low | `ithildin.py:958-961` | Without pdfplumber, `table` returns "text after the caption" but stops at the end of the caption's page. When the caption is the last line on its page, only the caption comes back. | Return the following lines regardless of the page break. |
 
 ---
 
