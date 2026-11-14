@@ -254,7 +254,6 @@ class I21_LargeIntegersKeepTheirDigits(unittest.TestCase):
         self.assertIn(f"sum {2 * big + 1:,}", summary)
 
 
-@pending("test_booleans_and_numbers_are_counted_apart")
 class I22_TrueIsNotTheNumberOne(unittest.TestCase):
     def test_booleans_and_numbers_are_counted_apart(self):
         self.assertEqual(squeeze._field_summary([True, 1, 1.0, True], 4, 40), "bool/num, 4/4, true×2, 1×2")

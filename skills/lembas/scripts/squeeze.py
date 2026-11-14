@@ -440,17 +440,17 @@ def _field_summary(values, total, str_len):
         parts.append(f"{nulls} null")
     vals = [v for v in values if _scalar(v) and v is not None]
     if vals:
-        hashable = [v if not isinstance(v, float) else round(v, 6) for v in vals]
-        distinct = Counter(hashable)
+        # True == 1 and False == 0 in Python, so booleans are counted under a key of their own.
+        distinct = Counter((isinstance(v, bool), round(v, 6) if isinstance(v, float) else v) for v in vals)
         nums = [v for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
         if len(distinct) <= 8:
-            parts.append(", ".join(f"{_fmt(v, 40)}×{c}" for v, c in distinct.most_common()))
+            parts.append(", ".join(f"{_fmt(v, 40)}×{c}" for (_, v), c in distinct.most_common()))
         elif nums and len(nums) == len(vals):
             uniq = " (unique)" if len(distinct) == len(vals) else ""
             parts.append(f"{_num(min(nums))}…{_num(max(nums))}{uniq}")
         else:
             uniq = "unique" if len(distinct) == len(vals) else f"{len(distinct):,} distinct"
-            ex = ", ".join(_fmt(v, str_len) for v, _ in distinct.most_common(2))
+            ex = ", ".join(_fmt(v, str_len) for (_, v), _ in distinct.most_common(2))
             parts.append(f"{uniq}, e.g. {ex}")
     lists = [v for v in values if isinstance(v, list)]
     if lists:
