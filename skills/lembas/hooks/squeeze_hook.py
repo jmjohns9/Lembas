@@ -67,9 +67,17 @@ def emit(obj):
     sys.stdout.write(json.dumps(obj))
 
 
-def read_text(path, limit=MAX_SCAN):
+def read_text(path, limit=None):
     with open(path, "rb") as fh:
-        return fh.read(limit).decode("utf-8", "replace")
+        return fh.read(MAX_SCAN if limit is None else limit).decode("utf-8", "replace")
+
+
+def _cut_note(path):
+    """A line to add to a summary when the file is larger than the part that was read, else ''."""
+    if os.path.getsize(path) <= MAX_SCAN:
+        return ""
+    size = f"{MAX_SCAN // 1_048_576} MB" if MAX_SCAN >= 1_048_576 else f"{MAX_SCAN // 1024} KB"
+    return f"\n[only the first {size} of {path} was read for this summary; search the file itself for anything later]"
 
 
 def on_bash(data):
@@ -90,7 +98,7 @@ def on_bash(data):
     changed = False
     view, _ = squeeze.squeeze(stdout, None, "auto", BUDGET, threshold, original)
     if view is not None:
-        new["stdout"] = view
+        new["stdout"] = view + (_cut_note(original) if original else "")
         changed = True
     stderr = resp.get("stderr") or ""
     if stderr:
@@ -158,7 +166,7 @@ def on_read_pre(data):
         return
     reason = (f"This file is {size / 1_048_576:.1f} MB, over the Read tool's 256 KB limit, so the lembas "
               f"squeeze hook returned a summary instead. Use grep, sed, jq or Read with offset/limit "
-              f"on {path} for exact lines.\n\n{view}")
+              f"on {path} for exact lines.\n\n{view}{_cut_note(path)}")
     emit({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                  "permissionDecisionReason": reason}})
 

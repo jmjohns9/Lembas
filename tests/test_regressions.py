@@ -283,7 +283,6 @@ class I28_NarrowingLooksAtCommandsNotArguments(unittest.TestCase):
             self.assertTrue(hook.NARROWING.search(cmd), cmd)
 
 
-@pending("test_summary_notes_that_only_part_of_the_file_was_read")
 class I29_OversizedSavedOutputSaysItWasCut(unittest.TestCase):
     def test_summary_notes_that_only_part_of_the_file_was_read(self):
         path = support.write(support.tmp("regressions", "i29", "saved.txt"), log_text(4000))
