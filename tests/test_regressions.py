@@ -269,7 +269,6 @@ class I23_ColumnSumsAreCorrectlyRounded(unittest.TestCase):
         self.assertTrue(summary.endswith("sum 1.5"), summary)
 
 
-@pending("test_words_in_arguments_and_file_names_do_not_count", "test_commands_in_command_position_still_count")
 class I28_NarrowingLooksAtCommandsNotArguments(unittest.TestCase):
     def test_words_in_arguments_and_file_names_do_not_count(self):
         for cmd in ["cat more.log", "pytest -k tail", "python tr.py", "make less-css", "npm run sort",

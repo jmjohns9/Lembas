@@ -31,7 +31,17 @@ READ_LIMIT = 256 * 1024          # Claude Code's Read size limit
 INLINE_LIMIT = 30000             # Claude Code shows Bash output up to about this many characters inline
 # A command that already narrows its output (grep, head, sed -n, a jq filter...) is a deliberate query.
 # Its result is what Claude asked for, so it is only squeezed when it is too big to show anyway.
-NARROWING = re.compile(r"(^|[|;&(]\s*|\s)(grep|egrep|rg|ag|head|tail|sed|awk|cut|jq|yq|sort|uniq|wc|tr|column|less|more|xargs)\b")
+#
+# The name has to be in command position: at the start, after a pipe or another separator, or behind
+# a wrapper such as sudo. A file called more.log or a flag value like `-k tail` is not a query.
+NARROWING = re.compile(
+    r"(?:^|[|;&(`\n]|\b(?:do|then|else)\s|-exec(?:dir)?\s)\s*"                  # where a command can start
+    r"(?:[A-Za-z_]\w*=\S*\s+)*"                                                  # VAR=value prefixes
+    r"(?:(?:sudo|time|command|nice|env|exec|nohup|git)\s+(?:-\S+\s+)*)*"         # wrappers, and `git grep`
+    r"(?:[\w./-]*/)?"                                                            # /usr/bin/
+    r"(?:grep|egrep|fgrep|rg|ag|head|tail|sed|awk|cut|jq|yq|sort|uniq|wc|tr|column|less|more|xargs)"
+    r"(?![\w.-])"
+)
 MAX_SCAN = 64 * 1024 * 1024      # don't load more than this from a saved output
 DATA_EXTS = {".log", ".out", ".json", ".jsonl", ".ndjson", ".csv", ".tsv"}
 
