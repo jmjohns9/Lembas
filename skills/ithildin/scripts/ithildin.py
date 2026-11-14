@@ -681,6 +681,15 @@ def cache_dir():
     return d
 
 
+PANDOC_EXTS = (".rst", ".odt", ".epub", ".rtf", ".org", ".tex", ".adoc", ".textile")
+
+
+def _looks_binary(path):
+    """True when the start of the file holds NUL bytes, which text never does and binary formats nearly always do."""
+    with open(path, "rb") as f:
+        return b"\x00" in f.read(8192)
+
+
 def _office(extract, path, kind):
     """Read a Word or PowerPoint file, or exit with a message if it is not really one."""
     try:
@@ -720,15 +729,26 @@ def load(path):
         doc = extract_markdown(path)
     elif ext in (".html", ".htm", ".xhtml"):
         doc = extract_html(path)
-    elif ext in (".txt", ".text", ".log", ""):
+    elif ext in (".txt", ".text", ".log"):
         doc = extract_text(path)
-    elif shutil.which("pandoc") and ext in (".rst", ".odt", ".epub", ".rtf", ".org", ".tex", ".adoc", ".textile"):
+    elif ext in PANDOC_EXTS and shutil.which("pandoc"):
         doc = extract_with_pandoc(path)
-    elif ext in (".doc", ".ppt", ".odp", ".rtf") and shutil.which("soffice"):
-        sys.exit(f"ithildin: convert first: soffice --headless --convert-to "
-                 f"{'docx' if ext in ('.doc', '.rtf') else 'pptx'} {path}")
+    elif ext in (".doc", ".ppt", ".odp", ".rtf"):
+        target = "docx" if ext in (".doc", ".rtf") else "pptx"
+        if shutil.which("soffice"):
+            sys.exit(f"ithildin: convert first: soffice --headless --convert-to {target} {path}")
+        sys.exit(f"ithildin: {ext} files cannot be read directly. Convert the file to {target} first, by saving it "
+                 f"as {target} from the application that made it or with LibreOffice "
+                 f"(soffice --headless --convert-to {target} FILE).")
+    elif ext in (".odt", ".epub"):
+        sys.exit(f"ithildin: reading {ext} files needs pandoc (https://pandoc.org), which is not installed. "
+                 "Install it, or convert the file to PDF, DOCX or Markdown.")
+    elif _looks_binary(path):
+        # Without this, a spreadsheet or an image would be mapped as if its bytes were the document.
+        sys.exit(f"ithildin: cannot read {os.path.basename(path)}: it is not a text file. Supported formats are "
+                 "PDF, DOCX, PPTX, Markdown, HTML and plain text, plus what pandoc converts when it is installed.")
     else:
-        doc = extract_text(path)
+        doc = extract_text(path)        # an unknown extension or none: plain text, or markup read as text
     finish(doc)
     try:
         with open(cpath, "w") as f:

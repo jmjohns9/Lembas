@@ -403,7 +403,6 @@ class I05_WordContentControlsAreRead(unittest.TestCase):
         self.assertEqual([t for _, t in doc.lines], ["one", "two", "three"])
 
 
-@pending("test_spreadsheets_and_other_binary_files", "test_formats_that_need_a_converter_say_which_one")
 class I10_UnsupportedFilesAreRefused(unittest.TestCase):
     def test_spreadsheets_and_other_binary_files(self):
         import zipfile
