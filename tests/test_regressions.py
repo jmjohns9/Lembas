@@ -659,7 +659,6 @@ class I36_NestedTableRowsAreNotRepeated(unittest.TestCase):
         self.assertIn("inner a", doc.tables[0]["rows"][0][0])
 
 
-@pending("test_external_tools_are_given_an_absolute_path")
 class I37_FileNamesCannotBeMistakenForOptions(unittest.TestCase):
     def test_external_tools_are_given_an_absolute_path(self):
         result = types.SimpleNamespace(returncode=0, stdout="Enough text on this page to count as a real text layer.\f", stderr="")

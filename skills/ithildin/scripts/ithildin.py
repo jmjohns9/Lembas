@@ -92,7 +92,8 @@ def extract_pdf(path):
     pages = None
     if shutil.which("pdftotext"):
         try:
-            r = _run(["pdftotext", "-enc", "UTF-8", path, "-"])
+            # An absolute path cannot be mistaken for an option, whatever the file is called.
+            r = _run(["pdftotext", "-enc", "UTF-8", os.path.abspath(path), "-"])
         except (subprocess.TimeoutExpired, OSError):
             r = None                    # fall back to pypdf, as for a failed run
         if r is not None and r.returncode == 0:
@@ -516,7 +517,7 @@ def extract_html(path):
 
 
 def extract_with_pandoc(path):
-    r = _run(["pandoc", path, "-t", "gfm", "--wrap=none"])
+    r = _run(["pandoc", os.path.abspath(path), "-t", "gfm", "--wrap=none"])
     if r.returncode != 0:
         sys.exit(f"ithildin: pandoc could not read {path}: {r.stderr.strip()[:300]}")
     return extract_markdown(path, r.stdout, os.path.splitext(path)[1].lstrip(".").upper() + " document")
