@@ -1,0 +1,45 @@
+[lembas squeeze: log, 1,200 lines, 235 error lines (2 distinct), 235 warnings. ~35,931 tokens shown as a summary. Full original: mid-app.log ; grep -n or sed -n 'A,Bp' the original for any line range. Lines marked L123 are original line numbers.]
+L1 2026-10-14 13:42:00,000 INFO  [http] GET /api/cart 200 98ms rid=bc1fb9bb22b392e6
+L2 2026-10-14 13:42:01,350 INFO  [http] GET /health 200 152ms rid=d31bf0e4c05a3aa9
+L3 2026-10-14 13:42:02,700 INFO  [http] GET /api/users/me 200 49ms rid=a99d141f267eb9c0
+L4 2026-10-14 13:42:04,050 INFO  [http] GET /api/orders 200 18ms rid=0cf7e2358f369720
+L5 2026-10-14 13:42:05,400 INFO  [http] GET /api/orders 200 14ms rid=4ba4eb5c2f9eefee
+  … L6–L46: 41 lines collapsed (see summary below)
+L47 2026-10-14 13:43:02,100 WARN  [db] slow query 2450ms: SELECT * FROM orders WHERE status = $1
+      [this warning repeats 2× in total, last at L287]
+  … L48–L673: 626 lines collapsed (see summary below)
+L674 2026-10-14 13:57:08,550 ERROR [payment-worker-3] Unhandled exception while settling order 88412
+L675 Traceback (most recent call last):
+L676   File "/srv/app/payments/settle.py", line 142, in settle_order
+L677     customer = order.payload['customer_id']
+L678   File "/srv/app/payments/models.py", line 57, in __getitem__
+L679     return self._data[key]
+L680 KeyError: 'customer_id'
+L681 2026-10-14 13:57:09,900 ERROR [cache] redis.exceptions.ConnectionError: Error 111 connecting to 10.0.4.17:6379. Connection refused.
+      [this error repeats 234× in total, last at L1147]
+L682 2026-10-14 13:57:11,250 WARN  [payment-worker-1] retrying order 80905 (attempt 5/5)
+      [this warning repeats 233× in total, last at L1146]
+  … L683–L1185: 503 lines collapsed (see summary below)
+L1186 2026-10-14 14:08:31,650 DEBUG [cache] hit key=user:5179 ttl=431s
+L1187 2026-10-14 14:08:33,000 INFO  [http] GET /api/cart 200 102ms rid=2aaabda13f30b576
+L1188 2026-10-14 14:08:34,350 INFO  [http] GET /api/users/me 200 117ms rid=5bf517f33bf488e6
+L1189 2026-10-14 14:08:35,700 INFO  [http] GET /api/orders 200 177ms rid=a29599b88cb45028
+L1190 2026-10-14 14:08:37,050 INFO  [http] GET /api/orders 200 37ms rid=f544eb87b2e81c92
+L1191 2026-10-14 14:08:38,400 DEBUG [cache] hit key=user:54044 ttl=128s
+L1192 2026-10-14 14:08:39,750 INFO  [http] GET /api/orders 200 61ms rid=e3411f6e46067447
+L1193 2026-10-14 14:08:41,100 INFO  [http] GET /api/search 200 169ms rid=2499c9c691fe7af7
+L1194 2026-10-14 14:08:42,450 INFO  [http] GET /api/search 200 147ms rid=03fc68c6f014997e
+L1195 2026-10-14 14:08:43,800 DEBUG [cache] hit key=user:21604 ttl=203s
+L1196 2026-10-14 14:08:45,150 INFO  [http] GET /api/cart 200 105ms rid=216793248d644acb
+L1197 2026-10-14 14:08:46,500 DEBUG [cache] hit key=user:53627 ttl=160s
+L1198 2026-10-14 14:08:47,850 INFO  [http] GET /api/orders 200 111ms rid=bb5eb81992304cc0
+L1199 2026-10-14 14:08:49,200 INFO  [http] GET /api/users/me 200 145ms rid=6729b5ad51d6b5e3
+L1200 2026-10-14 14:08:50,550 INFO  [http] GET /api/cart 200 47ms rid=4059a4e788adf810
+Collapsed lines: 704 lines in 7 patterns. Most common (count × first example):
+  166× L12 2026-10-14 13:42:14,850 DEBUG [cache] hit key=user:62557 ttl=526s
+  110× L7 2026-10-14 13:42:08,100 INFO  [http] GET /health 200 58ms rid=833f3fb24d6204df
+  103× L8 2026-10-14 13:42:09,450 INFO  [http] GET /api/orders 200 153ms rid=c22089a63983cc5a
+  100× L13 2026-10-14 13:42:16,200 INFO  [http] GET /api/search 200 147ms rid=ef67364204454736
+  92× L9 2026-10-14 13:42:10,800 INFO  [http] GET /api/users/me 200 140ms rid=27512c73f420e9fc
+  88× L6 2026-10-14 13:42:06,750 INFO  [http] GET /api/cart 200 108ms rid=deab78fc101bde7e
+  45× L11 2026-10-14 13:42:13,500 INFO  [scheduler] heartbeat ok workers=4 queue_depth=33

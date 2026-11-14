@@ -1,0 +1,23 @@
+[lembas squeeze: json, top level: object with 5 keys. ~127,224 tokens shown as a summary. Full original: orders.json ; query the original with jq for exact values. Lines marked L123 are original line numbers.]
+object: "list"
+url: "/v1/orders"
+has_more: true
+data: array[640] of objects at .data
+  fields (15):
+    id: str, 640/640, unique, e.g. "ord_100000", "ord_100001"
+    created_at: str, 640/640, unique, e.g. "2026-10-14T08:00:00Z", "2026-10-14T07:23:00Z"
+    status: str, 640/640, "delivered"×260, "shipped"×196, "paid"×170, "refunded"×10, "failed"×4
+    currency: str, 640/640, "USD"×640
+    total_cents: num, 640/640, 1,150…48,796
+    customer.id: str, 640/640, 620 distinct, e.g. "cus_6510", "cus_5983"
+    customer.email: str, 640/640, 615 distinct, e.g. "user1171@example.com", "user1913@example.com"
+    customer.tier: str, 640/640, "free"×330, "team"×167, "pro"×143
+    … +3 more fields: items, shipping.carrier, shipping.tracking
+  rare fields: error.code (in 4 items, e.g. [37, 211, 402, 588]); error.message (in 4 items, e.g. [37, 211, 402, 588]); refund.amount_cents (in 1 items, e.g. [133]); refund.reason (in 1 items, e.g. [133])
+  items that look like errors or failures: 4 (indexes 37, 211, 402, 588)
+    [37] id="ord_100037"; status="failed"; error.code="card_declined"; error.message="Payment failed: card declined"; created_at=…[+237 chars]
+    [211] id="ord_100211"; status="failed"; error.code="fraud_check_timeout"; error.message="Payment failed: fraud check timeout";…[+330 chars]
+meta:
+  request_id: "req_8f2a1c"
+  page: 1
+  page_size: 640

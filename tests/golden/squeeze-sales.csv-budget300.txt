@@ -1,0 +1,15 @@
+[lembas squeeze: csv, 9,000 rows × 7 columns. ~140,526 tokens shown as a summary. Full original: sales.csv ; compute exact sums, counts and filters on the original (pandas, csvkit, awk). Lines marked L123 are original line numbers.]
+columns (7), 9,000 data rows:
+  date (date): 2026-01-01 … 2027-01-10, 375 distinct
+  region (text): "East"×2274, "West"×2256, "South"×2252, "North"×2218
+  rep (text, 12 null): 20 distinct; top "W-rep-3"×479, "E-rep-3"×465, "E-rep-2"×464, "S-rep-4"×463
+  product (text): "Enterprise"×2272, "Team"×2267, "Pro"×2249, "Starter"×2212
+  units (int): min 1, max 40, mean 20.596, median 21, sum 185,364
+  unit_price (float): 49.0×2297, 19.99×2285, 129.5×2221, 349.0×2197; min 19.99, max 349, mean 134.73, median 49, sum 1,212,602.65
+  revenue (float): min 19.99, max 987,654.32, mean 2,888.30, median 1,323, sum 25,994,741.67
+    ! max 987,654.32 at L6063 is 70.7× the next largest (13,960)
+first rows:
+L1 date,region,rep,product,units,unit_price,revenue
+L2 2026-01-01,North,N-rep-1,Pro,38,19.99,759.62
+  … 8,998 rows not shown
+L9001 2027-01-10,North,N-rep-1,Enterprise,2,349.0,698.0

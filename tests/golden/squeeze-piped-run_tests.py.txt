@@ -1,0 +1,44 @@
+[lembas squeeze: log, 4,033 lines, 16 error lines (16 distinct), 0 warnings. ~77,358 tokens shown as a summary. Full original: piped-output ; grep -n or sed -n 'A,Bp' the original for any line range. Lines marked L123 are original line numbers.]
+L1 ============================= test session starts ==============================
+L2 platform linux -- Python 3.12.4, pytest-8.3.2, pluggy-1.5.0
+L3 rootdir: /srv/shop
+L4 collected 4000 items
+L5 
+  … L6–L1316: 1311 lines collapsed (see summary below)
+L1317 tests/test_tax.py::test_vat_rounding_eu[DE-19.99] FAILED [ 32%]
+  … L1318–L2707: 1390 lines collapsed (see summary below)
+L2708 tests/test_webhooks.py::test_retry_backoff_caps_at_five_minutes FAILED [ 67%]
+  … L2709–L3560: 852 lines collapsed (see summary below)
+L3561 tests/test_auth.py::test_refresh_token_rotation FAILED [ 88%]
+  … L3562–L4008: 447 lines collapsed (see summary below)
+L4009     def test_vat_rounding_eu(country, price):
+L4010         total = tax.apply_vat(price, country)
+L4011 >       assert total == Decimal("23.79")
+L4012 E       AssertionError: assert Decimal('23.78') == Decimal('23.79')
+L4013 tests/test_tax.py:88: AssertionError
+  … L4014–L4014: 1 lines collapsed (see summary below)
+L4015     def test_retry_backoff_caps_at_five_minutes():
+L4016         delays = [backoff(n) for n in range(12)]
+L4017 >       assert max(delays) <= 300
+L4018 E       assert 640 <= 300
+L4019 E        +  where 640 = max([5, 10, 20, 40, 80, 160, ...])
+L4020 tests/test_webhooks.py:41: AssertionError
+L4021 _____ test_refresh_token_rotation _____
+L4022     def test_refresh_token_rotation(client):
+L4023         r = client.post("/auth/refresh", json={"token": old})
+L4024 >       assert r.status_code == 200
+L4025 E       assert 500 == 200
+L4026 E        +  where 500 = <Response [500]>.status_code
+L4027 src/auth/tokens.py:117: KeyError: 'kid'
+L4028 tests/test_auth.py:64: AssertionError
+L4029 =========================== short test summary info ============================
+L4030 FAILED tests/test_tax.py::test_vat_rounding_eu[DE-19.99] - AssertionError: assert Decimal('23.78') == Decimal('23.79')
+L4031 FAILED tests/test_webhooks.py::test_retry_backoff_caps_at_five_minutes - assert 640 <= 300
+L4032 FAILED tests/test_auth.py::test_refresh_token_rotation - assert 500 == 200
+L4033 ======================= 3 failed, 3997 passed in 41.27s ========================
+Collapsed lines: 4000 lines in 5 patterns. Most common (count × first example):
+  3996× L6 tests/test_billing.py::test_billing_case_0000 PASSED [  0%]
+  1× L4005 tests/test_webhooks.py::test_webhooks_case_3999 PASSED [100%]
+  1× L4007 =================================== FAILURES ===================================
+  1× L4008 _____ test_vat_rounding_eu[DE-19.99] _____
+  1× L4014 _____ test_retry_backoff_caps_at_five_minutes _____

@@ -1,0 +1,52 @@
+[lembas squeeze: text, 24,008 lines, head and tail only. ~633,419 tokens shown as a summary. Full original: app.log ; read the original with an offset for the missing lines. Lines marked L123 are original line numbers.]
+L1 2026-10-14 08:00:00,000 INFO  [http] GET /api/search 200 5ms rid=361424b1ea125c50
+L2 2026-10-14 08:00:01,350 INFO  [http] GET /health 200 52ms rid=d2db9299d1e8e1ba
+L3 2026-10-14 08:00:02,700 INFO  [http] GET /api/search 200 149ms rid=d3e9b4ad86719d9f
+L4 2026-10-14 08:00:04,050 INFO  [scheduler] heartbeat ok workers=4 queue_depth=14
+L5 2026-10-14 08:00:05,400 INFO  [http] GET /api/orders 200 62ms rid=fa7802bbca2a86a8
+L6 2026-10-14 08:00:06,750 INFO  [http] GET /api/users/me 200 20ms rid=2e1280748d4129f9
+L7 2026-10-14 08:00:08,100 INFO  [scheduler] heartbeat ok workers=4 queue_depth=39
+L8 2026-10-14 08:00:09,450 DEBUG [cache] hit key=user:5959 ttl=11s
+L9 2026-10-14 08:00:10,800 INFO  [http] GET /api/orders 200 168ms rid=708929ef89a332da
+L10 2026-10-14 08:00:12,150 INFO  [http] GET /api/orders 200 32ms rid=a90195829c2f44bf
+L11 2026-10-14 08:00:13,500 DEBUG [cache] hit key=user:69929 ttl=48s
+L12 2026-10-14 08:00:14,850 INFO  [http] GET /api/cart 200 124ms rid=70e211f7f518dcbe
+L13 2026-10-14 08:00:16,200 INFO  [scheduler] heartbeat ok workers=3 queue_depth=37
+L14 2026-10-14 08:00:17,550 DEBUG [cache] hit key=user:32470 ttl=398s
+L15 2026-10-14 08:00:18,900 INFO  [scheduler] heartbeat ok workers=3 queue_depth=6
+L16 2026-10-14 08:00:20,250 INFO  [http] GET /health 200 93ms rid=08421ae84e1f5e4e
+L17 2026-10-14 08:00:21,600 INFO  [http] GET /api/search 200 122ms rid=3d617eadda1720d3
+L18 2026-10-14 08:00:22,950 INFO  [http] GET /api/orders 200 152ms rid=02db3d9db98dd7b1
+L19 2026-10-14 08:00:24,300 INFO  [http] GET /api/search 200 133ms rid=227d6acb4d372a7f
+L20 2026-10-14 08:00:25,650 INFO  [http] GET /api/cart 200 150ms rid=64fabe66d7a24b16
+L21 2026-10-14 08:00:27,000 INFO  [http] GET /api/orders 200 111ms rid=e60b02eb2fb4815a
+L22 2026-10-14 08:00:28,350 INFO  [http] GET /api/search 200 124ms rid=f422c8069a6a0668
+L23 2026-10-14 08:00:29,700 INFO  [scheduler] heartbeat ok workers=3 queue_depth=25
+L24 2026-10-14 08:00:31,050 DEBUG [cache] hit key=user:85471 ttl=58s
+L25 2026-10-14 08:00:32,400 INFO  [http] GET /health 200 26ms rid=f082fcc7ff55b6a3
+  … L26–L23983: 23,958 lines not shown
+L23984 2026-10-14 16:59:28,950 INFO  [scheduler] heartbeat ok workers=3 queue_depth=15
+L23985 2026-10-14 16:59:30,300 INFO  [scheduler] heartbeat ok workers=3 queue_depth=8
+L23986 2026-10-14 16:59:31,650 DEBUG [cache] hit key=user:14035 ttl=29s
+L23987 2026-10-14 16:59:33,000 INFO  [http] GET /api/users/me 200 55ms rid=81d7135fa007918b
+L23988 2026-10-14 16:59:34,350 INFO  [http] GET /health 200 166ms rid=7fd01018549930a8
+L23989 2026-10-14 16:59:35,700 INFO  [http] GET /health 200 155ms rid=c1c36ced8ee67a56
+L23990 2026-10-14 16:59:37,050 INFO  [http] GET /api/search 200 44ms rid=c3cdc2ba240f4304
+L23991 2026-10-14 16:59:38,400 INFO  [http] GET /api/orders 200 110ms rid=8cf4b61f28fe3504
+L23992 2026-10-14 16:59:39,750 DEBUG [cache] hit key=user:59351 ttl=596s
+L23993 2026-10-14 16:59:41,100 INFO  [http] GET /api/users/me 200 172ms rid=477336fa1159e35f
+L23994 2026-10-14 16:59:42,450 INFO  [http] GET /api/orders 200 39ms rid=6cf94c9a5c073b5f
+L23995 2026-10-14 16:59:43,800 INFO  [http] GET /api/orders 200 54ms rid=f114ffbbfa48b8ce
+L23996 2026-10-14 16:59:45,150 DEBUG [cache] hit key=user:76446 ttl=127s
+L23997 2026-10-14 16:59:46,500 INFO  [http] GET /api/users/me 200 99ms rid=95b8764a7413a817
+L23998 2026-10-14 16:59:47,850 INFO  [http] GET /api/cart 200 92ms rid=650b01e223f8ef11
+L23999 2026-10-14 16:59:49,200 INFO  [http] GET /api/search 200 162ms rid=3b770f5e0426852b
+L24000 2026-10-14 16:59:50,550 DEBUG [cache] hit key=user:59915 ttl=471s
+L24001 2026-10-14 16:59:51,900 INFO  [http] GET /api/cart 200 120ms rid=4e14696ee7a21810
+L24002 2026-10-14 16:59:53,250 INFO  [http] GET /api/search 200 171ms rid=f1d4bdae56178fdc
+L24003 2026-10-14 16:59:54,600 INFO  [http] GET /api/users/me 200 113ms rid=b3010e8117c075c1
+L24004 2026-10-14 16:59:55,950 DEBUG [cache] hit key=user:64597 ttl=487s
+L24005 2026-10-14 16:59:57,300 INFO  [http] GET /api/users/me 200 59ms rid=f4bdf736aa440407
+L24006 2026-10-14 16:59:58,650 INFO  [http] GET /health 200 12ms rid=b37b9c0698d1c533
+L24007 2026-10-14 18:00:00,000 INFO  [main] shutdown complete
+L24008 

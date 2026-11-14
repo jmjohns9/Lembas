@@ -1,0 +1,30 @@
+[lembas squeeze: log, 24,007 lines, 235 error lines (2 distinct), 357 warnings. ~633,419 tokens shown as a summary. Full original: app.log ; grep -n or sed -n 'A,Bp' the original for any line range. Lines marked L123 are original line numbers.]
+L1 2026-10-14 08:00:00,000 INFO  [http] GET /api/search 200 5ms rid=361424b1ea125c50
+L2 2026-10-14 08:00:01,350 INFO  [http] GET /health 200 52ms rid=d2db9299d1e8e1ba
+  … L3–L265: 263 lines collapsed (see summary below)
+L266 2026-10-14 08:05:57,750 WARN  [db] slow query 1433ms: SELECT * FROM orders WHERE status = $1
+      [this warning repeats 124× in total, last at L23952]
+  … L267–L15873: 15607 lines collapsed (see summary below)
+L15874 2026-10-14 13:57:08,550 ERROR [payment-worker-3] Unhandled exception while settling order 88412
+L15875 Traceback (most recent call last):
+L15876   File "/srv/app/payments/settle.py", line 142, in settle_order
+L15877     customer = order.payload['customer_id']
+L15878   File "/srv/app/payments/models.py", line 57, in __getitem__
+L15879     return self._data[key]
+L15880 KeyError: 'customer_id'
+L15881 2026-10-14 13:57:09,900 ERROR [cache] redis.exceptions.ConnectionError: Error 111 connecting to 10.0.4.17:6379. Connection refused.
+      [this error repeats 234× in total, last at L16347]
+L15882 2026-10-14 13:57:11,250 WARN  [payment-worker-1] retrying order 80905 (attempt 5/5)
+      [this warning repeats 233× in total, last at L16346]
+  … L15883–L24002: 8120 lines collapsed (see summary below)
+L24003 2026-10-14 16:59:54,600 INFO  [http] GET /api/users/me 200 113ms rid=b3010e8117c075c1
+L24004 2026-10-14 16:59:55,950 DEBUG [cache] hit key=user:64597 ttl=487s
+L24005 2026-10-14 16:59:57,300 INFO  [http] GET /api/users/me 200 59ms rid=f4bdf736aa440407
+L24006 2026-10-14 16:59:58,650 INFO  [http] GET /health 200 12ms rid=b37b9c0698d1c533
+L24007 2026-10-14 18:00:00,000 INFO  [main] shutdown complete
+Collapsed lines: 23402 lines in 7 patterns. Most common (count × first example):
+  5433× L8 2026-10-14 08:00:09,450 DEBUG [cache] hit key=user:5959 ttl=11s
+  3373× L3 2026-10-14 08:00:02,700 INFO  [http] GET /api/search 200 149ms rid=d3e9b4ad86719d9f
+  3318× L6 2026-10-14 08:00:06,750 INFO  [http] GET /api/users/me 200 20ms rid=2e1280748d4129f9
+  3289× L16 2026-10-14 08:00:20,250 INFO  [http] GET /health 200 93ms rid=08421ae84e1f5e4e
+  … 3 rarer patterns

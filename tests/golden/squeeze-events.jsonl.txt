@@ -1,0 +1,19 @@
+[lembas squeeze: jsonl, top level: array of 5,000. ~158,510 tokens shown as a summary. Full original: events.jsonl ; query the original with jq for exact values. Lines marked L123 are original line numbers.]
+array[5000] of objects at .
+  fields (7):
+    ts: str, 5000/5000, unique, e.g. "2026-10-14T08:00:00Z", "2026-10-14T08:00:07Z"
+    type: str, 5000/5000, "page_view"×3297, "click"×1307, "signup"×396
+    user: str, 5000/5000, 1,446 distinct, e.g. "u1328", "u931"
+    path: str, 5000/5000, "/blog"×1034, "/"×1008, "/pricing"×996, "/signup"×988, "/docs"×974
+    ms: num, 5000/5000, 20…900
+  rare fields: status_code (in 2 items, e.g. [1200, 3300]); error (in 2 items, e.g. [1200, 3300])
+  [0]:
+    ts: "2026-10-14T08:00:00Z"
+    type: "click"
+    user: "u984"
+    path: "/signup"
+    ms: 347
+  items that look like errors or failures: 2 (indexes 1200, 3300)
+    [1200] status_code=500; error="upstream timeout from /api/pricing"; ts="2026-10-14T10:20:00Z"; type="page_view"; user="u736"; path="/"; ms=241
+    [3300] status_code=500; error="upstream timeout from /api/pricing"; ts="2026-10-14T14:25:00Z"; type="signup"; user="u1130"; path="/blog"; ms=265
+  [4999] {"ts": "2026-10-14T17:43:13Z", "type": "page_view", "user": "u602", "path": "/signup", "ms": 406}
