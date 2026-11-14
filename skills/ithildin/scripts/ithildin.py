@@ -895,7 +895,15 @@ def resolve(doc, target):
     m = re.match(r"^[lL](\d+)(?:\s*-\s*[lL]?(\d+))?$", t)
     if m:
         a, b = int(m.group(1)), int(m.group(2) or m.group(1))
-        return max(a - 1, 0), min(b, len(doc.lines)), f"lines {a}-{b}"
+        n = len(doc.lines)
+        # An impossible range used to print a header with nothing under it, which reads as "this part is empty".
+        if a < 1:
+            sys.exit("ithildin: lines are numbered from 1.")
+        if b < a:
+            sys.exit(f"ithildin: line range L{a}-{b} runs backwards; did you mean L{b}-{a}?")
+        if a > n:
+            sys.exit(f"ithildin: lines {a}-{b} are past the end; the document has {n} lines.")
+        return a - 1, min(b, n), f"lines {a}-{b}"
     for h in doc.headings:
         if h["id"].lower() == t.lower().lstrip("§"):
             return h["line"], h["end"], _label(h)
@@ -916,7 +924,7 @@ def resolve(doc, target):
 def render_read(doc, targets, max_tokens):
     out = []
     budget = max_tokens
-    for target in targets:
+    for position, target in enumerate(targets):
         a, b, label = resolve(doc, target)
         out.append(f"[ithildin read: {label}, {span(doc, a, b)}]")
         cur = None
@@ -934,6 +942,9 @@ def render_read(doc, targets, max_tokens):
                 hint = f" Continue with: read FILE L{i + 1}-{b}"
                 if subs:
                     hint += " or by subsection: " + ", ".join(h["id"] for h in subs[:8])
+                unread = targets[position + 1:]
+                if unread:              # otherwise the reader cannot tell these were never reached
+                    hint += ". Not read yet: " + ", ".join(unread)
                 out.append(f"[truncated at {nxt} to stay under {max_tokens:,} tokens.{hint}]")
                 return "\n".join(out)
             out.append(text)

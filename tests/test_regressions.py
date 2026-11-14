@@ -490,9 +490,6 @@ class I11_BadInputGetsAMessageNotATraceback(unittest.TestCase):
         self.assertEqual(len(doc.lines), 1)
 
 
-@pending("test_a_range_past_the_end_is_an_error_that_gives_the_real_length",
-         "test_a_backwards_range_and_line_zero_are_errors",
-         "test_truncation_lists_the_targets_that_were_not_read")
 class I13_ReadRangesAreChecked(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
