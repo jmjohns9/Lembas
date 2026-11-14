@@ -300,13 +300,12 @@ class I29_OversizedSavedOutputSaysItWasCut(unittest.TestCase):
         self.assertNotIn("only the first", untouched)
 
 
-@pending("test_python_warning_classes")
 class I42_WarningClassNamesAreWarnings(unittest.TestCase):
     def test_python_warning_classes(self):
         for line in ["/app/x.py:10: UserWarning: glyph missing", "DeprecationWarning", "ResourceWarning: unclosed file",
                      "sys:1: RuntimeWarning: coroutine was never awaited"]:
             self.assertEqual(squeeze._severity(line), 1, line)
-        for line in ["Warnings are off", "see the WarningPolicy class docs", "no_warning_here"]:
+        for line in ["see the WarningPolicy class docs", "no_warning_here", "ran the prewarning hook"]:
             self.assertEqual(squeeze._severity(line), 0, line)
 
 

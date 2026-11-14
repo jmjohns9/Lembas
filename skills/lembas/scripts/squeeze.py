@@ -181,7 +181,10 @@ ERR = re.compile(
     r"timed out|timeout)" + _ALONE_R +
     r"|(?-i:[A-Za-z]+(?:Error|Exception))\b|\"\s5\d\d\s|\bHTTP/\d(?:\.\d)?\"?\s5\d\d\b"
 )
-WARN = re.compile(r"(?i)" + _ALONE_L + r"(warn|warning|warnings|deprecated|deprecation|retry|retrying)" + _ALONE_R + r"|\"\s4\d\d\s")
+WARN = re.compile(
+    r"(?i)" + _ALONE_L + r"(warn|warning|warnings|deprecated|deprecation|retry|retrying)" + _ALONE_R +
+    r"|(?-i:[A-Za-z]+Warning)\b|\"\s4\d\d\s"      # UserWarning, ResourceWarning: named like FooError above
+)
 NOT_ERR = re.compile(
     r"(?i)\b(0|no) (errors?|failures?|failed)\b|\berrors?\s*[=:]\s*0\b|\bfailed\s*[=:]\s*0\b|\bwithout errors?\b"
 )
