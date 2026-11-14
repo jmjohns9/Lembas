@@ -81,6 +81,14 @@ def _is_slice(tool_input):
     return bool(tool_input.get("offset") or tool_input.get("limit") or tool_input.get("pages"))
 
 
+def _is_partial(f):
+    """True when a Read result holds only part of its file (Read returns the first 2,000 lines by default)."""
+    shown, total, start = f.get("numLines"), f.get("totalLines"), f.get("startLine")
+    if isinstance(shown, int) and isinstance(total, int) and total > shown:
+        return True
+    return isinstance(start, int) and start > 1
+
+
 def on_read_post(data):
     ti = data.get("tool_input") or {}
     resp = data.get("tool_response")
@@ -90,7 +98,17 @@ def on_read_post(data):
     path = f.get("filePath") or ti.get("file_path", "")
     if os.path.splitext(path)[1].lower() not in DATA_EXTS:
         return
-    view, _ = squeeze.squeeze(f.get("content") or "", path, "auto", BUDGET, THRESHOLD, path)
+    content = f.get("content") or ""
+    if _is_partial(f):
+        # The summary names the file as its original and gives counts and sums for it, so it has to
+        # describe the whole file. Summarise that from disk, or leave the partial result as it is.
+        try:
+            if os.path.getsize(path) > MAX_SCAN:
+                return
+            content = read_text(path)
+        except OSError:
+            return
+    view, _ = squeeze.squeeze(content, path, "auto", BUDGET, THRESHOLD, path)
     if view is None:
         return
     new = json.loads(json.dumps(resp))

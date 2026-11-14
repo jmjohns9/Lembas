@@ -323,8 +323,6 @@ class I42_WarningClassNamesAreWarnings(unittest.TestCase):
 
 # ====================================================================== squeeze_hook.py
 
-@pending("test_summary_describes_the_whole_file_not_the_part_that_was_read",
-         "test_a_partial_read_is_left_alone_when_the_file_cannot_be_reread")
 class I03_PartialReadIsSummarisedFromTheWholeFile(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
