@@ -801,7 +801,15 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
             kind = "text"
         except Exception:
             return None, info
-    path = original_path or save_original(text, kind)
+    if original_path:
+        path = original_path
+    else:
+        try:
+            path = save_original(text, kind)
+        except OSError as exc:
+            # A summary must point at the full text. With nowhere to keep it, pass the input through.
+            info["error"] = f"could not save the original: {exc!r}"
+            return None, info
     header = (f"[lembas squeeze: {kind}, {facts}. ~{before:,} tokens shown as a summary. "
               f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}. Lines marked L123 are original line numbers.]")
     view = header + "\n" + body
@@ -835,6 +843,8 @@ def main(argv=None):
     view, info = squeeze(text, name, args.type, args.budget, args.threshold, original, hard_cap)
     out = view if view is not None else clean(text)
     sys.stdout.write(out if out.endswith("\n") else out + "\n")
+    if view is None and "error" in info:
+        sys.stderr.write(f"squeeze: {info['error']}; the input was printed unchanged\n")
     if args.stats:
         pct = 100 * (1 - info["after"] / info["before"]) if info["before"] else 0
         sys.stderr.write(f"squeeze: {info['kind']}, ~{info['before']:,} → ~{info['after']:,} tokens ({pct:.0f}% smaller)\n")

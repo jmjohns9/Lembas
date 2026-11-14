@@ -84,7 +84,6 @@ def pending(*names):
 
 # ====================================================================== squeeze.py
 
-@pending("test_command_line_prints_the_input_unchanged", "test_library_call_returns_none_and_records_why")
 class I01_PipedOutputSurvivesAnUnwritableCache(unittest.TestCase):
     def setUp(self):
         blocker = support.write(support.tmp("regressions", "i01", "blocker"), "a regular file")
