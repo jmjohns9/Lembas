@@ -34,8 +34,23 @@ INLINE_LIMIT = 30000             # Claude Code shows Bash output up to about thi
 NARROWING = re.compile(r"(^|[|;&(]\s*|\s)(grep|egrep|rg|ag|head|tail|sed|awk|cut|jq|yq|sort|uniq|wc|tr|column|less|more|xargs)\b")
 MAX_SCAN = 64 * 1024 * 1024      # don't load more than this from a saved output
 DATA_EXTS = {".log", ".out", ".json", ".jsonl", ".ndjson", ".csv", ".tsv"}
-BUDGET = int(os.environ.get("LEMBAS_SQUEEZE_BUDGET", squeeze.DEFAULT_BUDGET))
-THRESHOLD = int(os.environ.get("LEMBAS_SQUEEZE_THRESHOLD", squeeze.DEFAULT_THRESHOLD))
+
+
+def _setting(name, default):
+    """A whole-number setting from the environment. A bad value is reported and the default is used:
+    this runs on every tool call, so a typo in a variable must not turn into a failing hook."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        sys.stderr.write(f"lembas squeeze hook: {name}={raw!r} is not a whole number; using {default}\n")
+        return default
+
+
+BUDGET = _setting("LEMBAS_SQUEEZE_BUDGET", squeeze.DEFAULT_BUDGET)
+THRESHOLD = _setting("LEMBAS_SQUEEZE_THRESHOLD", squeeze.DEFAULT_THRESHOLD)
 
 
 def emit(obj):

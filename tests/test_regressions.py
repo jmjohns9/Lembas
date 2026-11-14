@@ -348,7 +348,6 @@ class I03_PartialReadIsSummarisedFromTheWholeFile(unittest.TestCase):
         self.assertIn("5,000 rows", json.loads(raw)["hookSpecificOutput"]["updatedToolOutput"]["file"]["content"])
 
 
-@pending("test_non_numeric_budget_or_threshold_falls_back_to_the_default", "test_small_payload_with_a_bad_setting")
 class I09_BadSettingsNeverBreakTheToolCall(unittest.TestCase):
     PAYLOAD = json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "cat x"},
                           "tool_response": {"stdout": log_text(), "stderr": ""}})
