@@ -151,11 +151,6 @@ class I07_DeeplyNestedJsonDoesNotCrash(unittest.TestCase):
         self.assertGreater(len(stdout), 100)
 
 
-@pending("test_json_with_a_bom_is_still_json",
-         "test_csv_with_a_bom_keeps_its_first_column_name",
-         "test_a_file_written_with_a_bom_through_the_command_line",
-         "test_markdown_with_a_bom_keeps_its_first_heading",
-         "test_text_and_html_with_a_bom")
 class I08_ByteOrderMarkIsIgnored(unittest.TestCase):
     RECORDS = [{"id": i, "status": "ok" if i % 50 else "failed", "error": None if i % 50 else "boom"} for i in range(3000)]
 

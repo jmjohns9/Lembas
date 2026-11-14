@@ -59,8 +59,10 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)"
 
 
 def clean(text):
-    """Remove terminal color codes and progress-bar redraws. Meaning is unchanged."""
+    """Remove terminal color codes, progress-bar redraws and a leading byte-order mark. Meaning is unchanged."""
     text = ANSI.sub("", text)
+    if text.startswith("﻿"):       # written by Excel and many Windows tools; it hides JSON and renames the first CSV column
+        text = text[1:]
     if "\r" in text:
         out = []
         for line in text.split("\n"):

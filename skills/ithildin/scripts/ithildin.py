@@ -424,7 +424,8 @@ def extract_pptx(path):
 def extract_markdown(path, text=None, kind="Markdown"):
     doc = Doc(path, kind)
     if text is None:
-        with open(path, encoding="utf-8", errors="replace") as f:
+        # utf-8-sig drops a leading byte-order mark, which would otherwise hide a first-line heading.
+        with open(path, encoding="utf-8-sig", errors="replace") as f:
             text = f.read()
     fence = False
     pending = []          # rows of a Markdown table being read
@@ -502,7 +503,7 @@ class _HTMLText(html.parser.HTMLParser):
 
 
 def extract_html(path):
-    with open(path, encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
         p = _HTMLText()
         p.feed(f.read())
         p.flush()
