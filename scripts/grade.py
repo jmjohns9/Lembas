@@ -18,7 +18,8 @@ import pathlib
 import re
 import sys
 
-OPENERS = re.compile(r"^(sure|great|good question|hi!|hello|certainly|absolutely)", re.I)
+# Whole words only: "Greater isolation..." and "Surely..." are answers, "Great question!" is not.
+OPENERS = re.compile(r"^(sure|great|good question|hi|hello|certainly|absolutely)\b(?!-)", re.I)
 CLOSERS = re.compile(r"(let me know|happy to|want me to|i can also|hope this helps)", re.I)
 PROBLEM_CATEGORIES = {"troubleshooting", "comparison", "safety", "advice"}
 

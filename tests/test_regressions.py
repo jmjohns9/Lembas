@@ -825,7 +825,6 @@ class I38_BenchmarkRunnersSurviveAFailedRun(unittest.TestCase):
         self.assertFalse(os.path.exists(folders[0]))
 
 
-@pending("test_words_that_merely_start_like_a_greeting_are_fine")
 class I39_OpenerCheckUsesWholeWords(unittest.TestCase):
     def opens_with_answer(self, text):
         return {label: ok for _, label, ok in grade.checks(text, {"must_contain": []}, "baseline")}["opens with the answer"]
