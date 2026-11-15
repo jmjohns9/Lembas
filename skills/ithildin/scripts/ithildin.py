@@ -1081,7 +1081,9 @@ def render_table(doc, tid):
                 rows = [[norm(c or "") for c in r] for r in tb]
                 head = f"[ithildin table {t['id']} ({t['caption']}), extracted from p{pn}, {len(rows)} rows]"
                 return head + "\n" + "\n".join("| " + " | ".join(r) + " |" for r in rows)
-        a, b, _ = resolve(doc, f"p{t['page']}")
+        # A caption at the foot of a page is often followed by its table on the next page.
+        last = t["page"] + 1 if t["page"] < (doc.pages or 0) else t["page"]
+        a, b, _ = resolve(doc, f"p{t['page']}-{last}" if last > t["page"] else f"p{t['page']}")
         start = t["line"]
         return (f"[ithildin table {t['id']}: no table grid detected; text after the caption follows]\n" +
                 "\n".join(x for _, x in doc.lines[start:min(b, start + 60)]))

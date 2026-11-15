@@ -682,7 +682,6 @@ class I44_CacheKeyIncludesTheFileType(unittest.TestCase):
         self.assertEqual((as_text.kind, len(as_text.headings)), ("Text", 0))
 
 
-@pending("test_text_after_a_caption_at_the_foot_of_a_page_is_returned")
 class I45_TableTextFallbackCrossesThePageBreak(unittest.TestCase):
     def test_text_after_a_caption_at_the_foot_of_a_page_is_returned(self):
         doc = ithildin.Doc("/nonexistent/x.pdf", "PDF")
