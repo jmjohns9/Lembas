@@ -607,7 +607,6 @@ class I32_FiguresAreNotTables(unittest.TestCase):
                          "Use read p1 for the text around it.")
 
 
-@pending("test_title_is_not_body_text_and_a_break_does_not_split_a_heading")
 class I33_HtmlHeadAndLineBreaks(unittest.TestCase):
     def test_title_is_not_body_text_and_a_break_does_not_split_a_heading(self):
         page = ("<html><head><title>Tab title</title><meta name=x content=y></head><body><header>Site header</header>"

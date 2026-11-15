@@ -473,6 +473,7 @@ def extract_markdown(path, text=None, kind="Markdown"):
 
 
 class _HTMLText(html.parser.HTMLParser):
+    SKIP = ("script", "style", "nav", "noscript", "title")   # <title> is the tab name, not page text
     BLOCK = {"p", "div", "li", "tr", "br", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "section",
              "article", "table", "blockquote", "dd", "dt"}
 
@@ -490,8 +491,11 @@ class _HTMLText(html.parser.HTMLParser):
         self.buf = []
 
     def handle_starttag(self, tag, attrs):
-        if tag in ("script", "style", "nav", "noscript"):
+        if tag in self.SKIP:
             self.skip += 1
+        if tag == "br" and self.head:
+            self.buf.append(" ")   # a break inside a heading is still one heading
+            return
         if tag in self.BLOCK:
             self.flush()
             self.head = int(tag[1]) if re.match(r"h[1-6]$", tag) else None
@@ -499,9 +503,9 @@ class _HTMLText(html.parser.HTMLParser):
             self.buf.append(" | ")
 
     def handle_endtag(self, tag):
-        if tag in ("script", "style", "nav", "noscript") and self.skip:
+        if tag in self.SKIP and self.skip:
             self.skip -= 1
-        if tag in self.BLOCK:
+        if tag in self.BLOCK and tag != "br":
             self.flush()
             self.head = None
 
