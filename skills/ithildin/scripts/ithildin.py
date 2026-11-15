@@ -1036,6 +1036,10 @@ def render_table(doc, tid):
     if not match:
         sys.exit(f"ithildin: no table {tid!r}. Tables: " + ", ".join(t["id"] for t in doc.tables[:40]))
     t = match[0]
+    if t.get("figure"):
+        where = f"p{t['page']}" if t.get("page") else loc(doc, t["line"])
+        sys.exit(f"ithildin: {t['id']} is a figure ({t['caption']}), which has no rows. "
+                 f"Use read {where} for the text around it.")
     if t.get("rows"):
         rows = t["rows"]
         head = f"[ithildin table {t['id']} at {loc(doc, t['line'])}: {t['caption'] or 'no caption'}, {len(rows)} rows]"

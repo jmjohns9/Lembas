@@ -594,7 +594,6 @@ class I31_EveryHitIsMarkedWithContext(unittest.TestCase):
                                  " L4 §S1 | third plain line"])
 
 
-@pending("test_table_command_on_a_figure_id_points_to_read")
 class I32_FiguresAreNotTables(unittest.TestCase):
     def test_table_command_on_a_figure_id_points_to_read(self):
         doc = ithildin.Doc("x.pdf", "PDF")
