@@ -131,7 +131,9 @@ def _csv_shape(lines):
     return None
 
 
-def detect(text, name=None):
+def detect(text, name=None, parsed=None):
+    """The kind of `text`. When it is recognised by parsing it as JSON, the object is put in
+    parsed["json"] (if a dict is given), so the caller does not parse a large input twice."""
     ext = os.path.splitext(name or "")[1].lower()
     if ext == ".json":
         return "json"
@@ -144,7 +146,9 @@ def detect(text, name=None):
     stripped = text.lstrip()
     if stripped[:1] in "{[":
         try:
-            json.loads(stripped)
+            obj = json.loads(stripped)
+            if parsed is not None:
+                parsed["json"] = obj
             return "json"
         except (ValueError, RecursionError):      # not JSON, or nested too deeply to parse
             pass
@@ -865,9 +869,10 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
     info = {"kind": kind, "before": before, "after": before}
     if before <= threshold:
         return None, info
+    parsed = {}   # filled by detect() when it had to parse JSON to recognise it
     if kind == "auto":
         try:
-            kind = detect(text, name)
+            kind = detect(text, name, parsed)
         except Exception as exc:  # detection is a guess; a failure here must not lose the output
             info["error"] = repr(exc)
             kind = "text"
@@ -878,7 +883,7 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
         kind = "text"
     try:
         if kind == "json":
-            body, facts = squeeze_json(json.loads(text), budget, "json")
+            body, facts = squeeze_json(parsed["json"] if "json" in parsed else json.loads(text), budget, "json")
         elif kind == "jsonl":
             recs = []
             for l in text.split("\n"):

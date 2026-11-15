@@ -73,6 +73,14 @@ class Detect(unittest.TestCase):
         for name, want in cases.items():
             self.assertEqual(squeeze.detect("anything at all", name), want, name)
 
+    def test_json_found_by_parsing_is_handed_back(self):
+        parsed = {}
+        self.assertEqual(squeeze.detect('  [{"a": 1}]', None, parsed), "json")
+        self.assertEqual(parsed["json"], [{"a": 1}])
+        parsed = {}
+        squeeze.detect('{"a": 1}', "x.json", parsed)        # known by name: nothing is parsed
+        self.assertEqual(parsed, {})
+
     def test_json_documents(self):
         self.assertEqual(squeeze.detect('{"a": 1}'), "json")
         self.assertEqual(squeeze.detect("  \n[1, 2, 3]"), "json")
