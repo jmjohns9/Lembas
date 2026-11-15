@@ -55,6 +55,40 @@ Recorded before any change, on macOS (Darwin 27, arm64).
 
 Environment: Python 3.12.13 (the version CI pins), pypdf 7.1.0, pdfplumber 0.11.10, reportlab 5.1.0, python-docx 1.2.0, python-pptx 1.0.2, poppler 26.11.0. CI passed on this same commit on 2026-10-26; the difference is explained in [T-1](#t-1).
 
+## After this branch
+
+Every finding was fixed in its own commit, whose message names the finding (`git log --grep "I-14"`). Each bug fix first added a failing test in `tests/test_regressions.py`.
+
+| Status | Findings |
+|---|---|
+| Fixed | I-1 to I-5, I-7 to I-42, I-44, I-45; O-1 to O-6, O-9; T-1 to T-8 |
+| Fixed in the README rewrite | I-6 (the install links). Publishing a GitHub release, which the old links pointed to, is left to the maintainer |
+| Open | [I-43](#i-43): removing running headers can also delete numbered chapter headings. Kept as a known failure (`expectedFailure`) in `tests/test_regressions.py`: fixing it needs a better header detector, not a patch |
+| Not done | O-7 (log severity regexes) and O-8 (CLI memory on huge inputs): both low, and the measurements did not show a problem worth the change. The eval runners under `evals/` still leave files unclosed (`ResourceWarning` under `-W error`), like T-6 did for the tests |
+
+| Measure | Before | After |
+|---|---|---|
+| Tests | 43 (41 passing on macOS) | 476 passing, plus 1 known failure (I-43) |
+| Line coverage, `skills/` and `scripts/` (hook included) | 83% of 1,638 statements | 98% of 1,893 statements |
+| `ruff check` (bugs and dead code) | 8 findings, no configuration | 0 |
+| Python versions the suite passes on | 3.12 on Linux only | 3.8, 3.9, 3.12 and 3.13 on macOS; CI runs 3.9, 3.12 and 3.13 |
+
+Speed, best of several runs on the same machine (macOS, arm64, Python 3.12). Changes under about 10% are within run-to-run noise: the bare interpreter itself measured 15.9 ms before and 13.8 ms after.
+
+| Task | Before | After | Finding |
+|---|---:|---:|---|
+| `find` with a common pattern on a 7 MB document (12,000 hits) | 2,555 ms | 371 ms | O-1 |
+| Squeeze a JSON array of 100,000 objects (12.4 MB) | 1,005 ms | 673 ms | O-2 |
+| Same, piped with no file name | 1,113 ms | 676 ms | O-2, O-5 |
+| Squeeze a 200,000-row CSV (4.7 MB) | 1,079 ms | 769 ms | O-3 |
+| Hook on a small Bash result (runs on every tool call) | 28.8 ms | 19.9 ms | O-4 |
+| Hook when switched off | 28.7 ms | 17.4 ms | O-4 |
+| Cold load of a 7 MB Markdown file | 869 ms | 510 ms | O-6 |
+| Cold load of a PDF without bookmarks | 435 ms | 384 ms | O-9 |
+| Squeeze a 1.9 MB log | 311 ms | 301 ms | none (unchanged) |
+
+Outputs are byte-identical before and after each optimization: the golden tests check the command-line output, and each change was also compared on the benchmark files and on randomly generated inputs (see the commit messages).
+
 ## Project map
 
 Lembas is two Claude skills plus the tooling that measures them. A *skill* is a folder holding a `SKILL.md` file (instructions Claude loads) and optional scripts Claude can run.
