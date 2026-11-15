@@ -25,6 +25,7 @@ import os
 import posixpath
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -671,14 +672,32 @@ def _gist(text):
 # Loading with a cache
 # ---------------------------------------------------------------------------
 
-def cache_dir():
-    d = os.environ.get("ITHILDIN_CACHE") or os.path.join(tempfile.gettempdir(), "ithildin")
+def _private_temp_dir(name):
+    """A folder for `name` under the system temp folder that only the current user can read.
+
+    The temp folder is shared, so another user could have made a folder of that name first and would
+    then be able to read everything written into it. Such a folder is not used: a new private one is."""
+    d = os.path.join(tempfile.gettempdir(), name)
     os.makedirs(d, mode=0o700, exist_ok=True)
+    if hasattr(os, "getuid"):
+        st = os.lstat(d)
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            return tempfile.mkdtemp(prefix=name + "-")
     try:
-        os.chmod(d, 0o700)   # parsed documents can hold confidential text
+        os.chmod(d, 0o700)
     except OSError:
         pass
     return d
+
+
+def cache_dir():
+    """Where parsed documents are cached. They can hold confidential text, so the default folder is private.
+    A folder named in ITHILDIN_CACHE is the user's own choice and keeps its permissions."""
+    chosen = os.environ.get("ITHILDIN_CACHE")
+    if chosen:
+        os.makedirs(chosen, mode=0o700, exist_ok=True)
+        return chosen
+    return _private_temp_dir("ithildin")
 
 
 PANDOC_EXTS = (".rst", ".odt", ".epub", ".rtf", ".org", ".tex", ".adoc", ".textile")
@@ -751,7 +770,7 @@ def load(path):
         doc = extract_text(path)        # an unknown extension or none: plain text, or markup read as text
     finish(doc)
     try:
-        with open(cpath, "w") as f:
+        with os.fdopen(os.open(cpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             json.dump({k: v for k, v in doc.__dict__.items() if k != "path"}, f)
     except OSError:
         pass

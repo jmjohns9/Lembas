@@ -29,6 +29,7 @@ import json
 import math
 import os
 import re
+import stat
 import statistics
 import sys
 import tempfile
@@ -766,10 +767,28 @@ HINTS = {
 }
 
 
+def _private_temp_dir(name):
+    """A folder for `name` under the system temp folder that only the current user can read.
+
+    The temp folder is shared, so another user could have made a folder of that name first and would
+    then be able to read everything written into it. Such a folder is not used: a new private one is."""
+    d = os.path.join(tempfile.gettempdir(), name)
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    if hasattr(os, "getuid"):
+        st = os.lstat(d)
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            return tempfile.mkdtemp(prefix=name + "-")
+    try:
+        os.chmod(d, 0o700)
+    except OSError:
+        pass
+    return d
+
+
 def _cache_path(text, kind, cache_dir=None):
     """Where the original of `text` is kept. The name is a hash of the content, so it can be worked
     out, and quoted in a summary, before anything is written."""
-    cache_dir = cache_dir or os.environ.get("LEMBAS_SQUEEZE_DIR") or os.path.join(tempfile.gettempdir(), "lembas-squeeze")
+    cache_dir = cache_dir or os.environ.get("LEMBAS_SQUEEZE_DIR") or _private_temp_dir("lembas-squeeze")
     ext = {"log": ".log", "json": ".json", "jsonl": ".jsonl", "csv": ".csv"}.get(kind, ".txt")
     return os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
 

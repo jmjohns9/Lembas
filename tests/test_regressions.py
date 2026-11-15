@@ -534,9 +534,6 @@ class I14_DepthCountsFromTheShallowestHeading(unittest.TestCase):
         self.assertEqual(out("map", path, "--depth", "9"), out("map", path))
 
 
-@pending("test_ithildin_cache_files_are_private",
-         "test_a_folder_the_user_chose_keeps_its_permissions",
-         "test_a_default_folder_owned_by_someone_else_is_not_used")
 class I15_CacheFoldersArePrivateAndRespectful(unittest.TestCase):
     def test_ithildin_cache_files_are_private(self):
         cache = support.tmp("regressions", "i15", "ith-cache", "x")[:-2]
