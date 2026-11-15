@@ -9,14 +9,28 @@ permissions:
   contents: read
 
 jobs:
-  benchmark:
+  # The full suite, with the optional PDF and Office libraries and poppler installed.
+  full:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to a commit; the comment names the release it points to.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          pip install -q -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: python -m unittest discover -s tests
 
       - name: Skill files have name and description
         run: |
@@ -32,18 +46,25 @@ jobs:
       - name: Facts kept and answer structure
         run: python3 scripts/grade.py evals/evals.json evals/results/v2.0.0
 
-      - name: Squeeze compressor and hook
-        run: python3 tests/test_squeeze.py
-
-      - name: Ithildin document reader
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq poppler-utils
-          pip install -q pypdf pdfplumber reportlab python-docx python-pptx
-          python3 tests/test_ithildin.py
-
       - name: Package builds
         run: |
           bash scripts/package.sh
           unzip -l dist/lembas.skill | grep -q 'lembas/SKILL.md'
           unzip -l dist/ithildin.skill | grep -q 'ithildin/scripts/ithildin.py'
+
+  # The skills need only the standard library. Run the suite with nothing installed, on the oldest
+  # and newest Python versions, so a newer-only feature or a hidden dependency shows up here.
+  stdlib:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Tests (optional libraries absent; their tests are skipped)
+        run: python -m unittest discover -s tests
