@@ -276,7 +276,8 @@ def _pdf_outline(doc):
         num = m.group(1) if m and re.match(r"^\d", title) else ""
         doc.headings.append({"line": line_idx, "level": level, "num": num, "title": title})
     doc.headings.sort(key=lambda h: h["line"])
-    doc.outline_source = "PDF bookmarks"
+    if doc.headings:   # a scan has bookmarks but no text lines for them to point at
+        doc.outline_source = "PDF bookmarks"
 
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -424,7 +425,8 @@ def extract_pptx(path):
                         for tr in tbl.iter(P + "tr")]
                 _add_table(doc, rows, i)
         doc.pages = len(names)
-    doc.outline_source = "slide titles"
+    if doc.headings:
+        doc.outline_source = "slide titles"
     return doc
 
 

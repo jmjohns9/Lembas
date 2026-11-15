@@ -617,7 +617,6 @@ class I33_HtmlHeadAndLineBreaks(unittest.TestCase):
         self.assertEqual([h["title"] for h in doc.headings], ["Install guide"])
 
 
-@pending("test_bookmarks_that_match_no_text_are_not_reported_as_the_outline")
 @unittest.skipUnless(support.manual_docs().get("manual.pdf"), "reportlab is needed to build a PDF")
 class I35_OutlineSourceIsOnlyClaimedWhenUsed(unittest.TestCase):
     def test_bookmarks_that_match_no_text_are_not_reported_as_the_outline(self):
