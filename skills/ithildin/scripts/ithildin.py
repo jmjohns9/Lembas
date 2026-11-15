@@ -350,8 +350,8 @@ def extract_docx(path):
             doc.add(text)
         elif child.tag == W + "tbl":
             rows = []
-            for tr in child.iter(W + "tr"):
-                cells = [norm(_docx_text(tc)) for tc in tr.findall(W + "tc")]
+            for tr in _docx_children(child, (W + "tr",)):   # not .iter(): a nested table's rows are inside a cell
+                cells = [norm(_docx_text(tc)) for tc in _docx_children(tr, (W + "tc",))]
                 rows.append(cells)
             _add_table(doc, rows)
     if doc.headings:

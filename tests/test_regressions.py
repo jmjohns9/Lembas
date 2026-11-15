@@ -634,7 +634,6 @@ class I35_OutlineSourceIsOnlyClaimedWhenUsed(unittest.TestCase):
         self.assertNotIn("Outline from PDF bookmarks", first)
 
 
-@pending("test_outer_table_has_only_its_own_rows")
 class I36_NestedTableRowsAreNotRepeated(unittest.TestCase):
     def test_outer_table_has_only_its_own_rows(self):
         inner = support.w_tbl([["inner a", "inner b"]])
