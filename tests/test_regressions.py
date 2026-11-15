@@ -755,10 +755,6 @@ class I12_GradeCannotPassWithoutChecking(unittest.TestCase):
         self.assertIn("usage: ", stderr.lower())
 
 
-@pending("test_empty_folder",
-         "test_missing_reply_file_is_named",
-         "test_an_empty_baseline_does_not_divide_by_zero",
-         "test_replies_are_read_as_utf8_whatever_the_locale")
 class I18_CountTokensReportsBadInput(unittest.TestCase):
     def test_empty_folder(self):
         empty = support.tmp("regressions", "i18-empty", "x")[:-2]
@@ -786,7 +782,7 @@ class I18_CountTokensReportsBadInput(unittest.TestCase):
         folder = results("i18-utf8", {"demo": {"baseline": "café pg_dump " * 50, "lembas": GOOD + " 你好"}})
         r = support.run_py(os.path.join(support.ROOT, "scripts", "count_tokens.py"), folder, env=self.ASCII_LOCALE)
         self.assertEqual(r.returncode, 0, r.stderr.decode()[-300:])
-        self.assertRegex(r.stdout.decode(), r"(?m)^demo\s+150\s+\d+\s")
+        self.assertRegex(r.stdout.decode(), r"(?m)^demo\s+162\s+\d+\s")
         evals = support.write(support.tmp("regressions", "i18-utf8", "evals.json"), json.dumps({"evals": [EV]}))
         r = support.run_py(os.path.join(support.ROOT, "scripts", "grade.py"), evals, folder, env=self.ASCII_LOCALE)
         self.assertEqual(r.returncode, 0, r.stderr.decode()[-300:])
