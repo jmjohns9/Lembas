@@ -720,11 +720,6 @@ EV = {"name": "demo", "category": "safety", "must_contain": ["pg_dump"]}
 GOOD = "**Problem.** Live table.\n\n**Fix.** Run pg_dump.\n\n**Alternatives.** A view if you can wait.\n\n**Why this fix.** Reversible."
 
 
-@pending("test_empty_or_missing_results_folder_fails",
-         "test_a_missing_lembas_reply_fails_and_is_named",
-         "test_a_missing_baseline_is_only_a_warning",
-         "test_an_empty_reply_fails_its_checks_instead_of_crashing",
-         "test_missing_arguments_print_usage")
 class I12_GradeCannotPassWithoutChecking(unittest.TestCase):
     def evals(self, name, evs=(EV,)):
         return support.write(support.tmp("regressions", name, "evals.json"), json.dumps({"evals": list(evs)}))

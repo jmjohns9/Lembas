@@ -9,8 +9,10 @@ For every eval it checks each reply (baseline.md, lembas.md) for:
     advice): the four labeled parts Problem, Fix, Alternatives and Why
   * style: no greeting or praise in the first line, no closing offer of help, no em or en dashes
 
-Exits non-zero if a lembas.md reply misses a required check. Style misses are printed as warnings.
+Exits non-zero if a lembas.md reply is missing, empty or misses a required check. Style misses, and a
+missing or empty baseline.md, are printed as warnings.
 """
+import argparse
 import json
 import pathlib
 import re
@@ -37,16 +39,27 @@ def checks(text, ev, variant):
 
 
 def main():
-    evals = json.loads(pathlib.Path(sys.argv[1]).read_text())["evals"]
-    results_dir = pathlib.Path(sys.argv[2])
+    ap = argparse.ArgumentParser(description="Check Lembas replies against evals.json.")
+    ap.add_argument("evals", help="evals.json")
+    ap.add_argument("results", help="folder with one subfolder per eval holding baseline.md and lembas.md")
+    args = ap.parse_args()
+    evals = json.loads(pathlib.Path(args.evals).read_text(encoding="utf-8"))["evals"]
+    results_dir = pathlib.Path(args.results)
+    if not results_dir.is_dir():
+        print(f"grade: no results folder at {results_dir}", file=sys.stderr)
     totals = {}
     failed = False
     for ev in evals:
         for variant in ("baseline", "lembas"):
             reply = results_dir / ev["name"] / f"{variant}.md"
-            if not reply.exists():
+            # A reply that is not there, or has no text, cannot pass. Only the lembas reply is graded.
+            text = reply.read_text(encoding="utf-8") if reply.is_file() else None
+            problem = "reply file is missing" if text is None else "reply is empty" if not text.strip() else None
+            if problem:
+                print(f"{'FAIL' if variant == 'lembas' else 'warn'} {variant:8} {ev['name']}: {problem}")
+                failed |= variant == "lembas"
                 continue
-            for kind, label, ok in checks(reply.read_text(), ev, variant):
+            for kind, label, ok in checks(text, ev, variant):
                 t = totals.setdefault(variant, [0, 0])
                 t[0] += ok
                 t[1] += 1
