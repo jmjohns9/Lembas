@@ -35,6 +35,7 @@ import statistics
 import sys
 import tempfile
 from collections import Counter
+from functools import lru_cache
 
 VERSION = "1.0.0"   # this script's own version, printed by --version; not the Lembas release number
 DEFAULT_THRESHOLD = 2000
@@ -390,14 +391,25 @@ def _flatten(obj, prefix="", depth=0, out=None):
 
 
 def _is_bad(item):
-    flat = _flatten(item) if isinstance(item, dict) else {}
+    return isinstance(item, dict) and _is_bad_flat(_flatten(item))
+
+
+@lru_cache(maxsize=4096)
+def _key_roles(key):
+    """Whether a field name is an error, status or code field. Arrays repeat the same few names
+    thousands of times, so this is worked out once per name."""
+    leaf = key.rsplit(".", 1)[-1]
+    return leaf.lower() in ERR_KEYS, bool(STATUS_KEYS.match(leaf)), bool(CODE_KEYS.match(leaf))
+
+
+def _is_bad_flat(flat):
     for k, v in flat.items():
-        leaf = k.rsplit(".", 1)[-1]
-        if leaf.lower() in ERR_KEYS and v not in (None, "", [], {}, False, 0):
+        is_err, is_status, is_code = _key_roles(k)
+        if is_err and v not in (None, "", [], {}, False, 0):
             return True
-        if STATUS_KEYS.match(leaf) and isinstance(v, str) and BAD_VALUE.search(v):
+        if is_status and isinstance(v, str) and BAD_VALUE.search(v):
             return True
-        if CODE_KEYS.match(leaf) and isinstance(v, int) and not isinstance(v, bool) and 400 <= v <= 599:
+        if is_code and isinstance(v, int) and not isinstance(v, bool) and 400 <= v <= 599:
             return True
     return False
 
@@ -467,7 +479,28 @@ def _field_summary(values, total, str_len):
     return ", ".join(parts)
 
 
-def _render_json(v, path, depth, L, out, ind):
+def _array_facts(arr, cache):
+    """What _render_array needs about an array that does not depend on the detail level. squeeze_json
+    renders at up to five levels, so this is worked out once per array: each object is flattened once,
+    for both its fields and the failure check, and each field's values are gathered in one pass."""
+    if id(arr) in cache:
+        return cache[id(arr)]
+    flats, bad = [], []
+    for i, x in enumerate(arr):
+        if isinstance(x, dict):
+            flat = _flatten(x)
+            flats.append(flat)
+            if _is_bad_flat(flat):
+                bad.append(i)
+    values = {}   # field -> its values, in item order; keys in order of first appearance
+    for flat in flats:
+        for k, v in flat.items():
+            values.setdefault(k, []).append(v)
+    cache[id(arr)] = flats, values, bad
+    return cache[id(arr)]
+
+
+def _render_json(v, path, depth, L, out, ind, cache):
     pad = "  " * ind
     if isinstance(v, dict):
         if depth >= L["depth"]:
@@ -491,16 +524,16 @@ def _render_json(v, path, depth, L, out, ind):
                 out.append(f"{pad}{k}: {{}}")
             elif isinstance(x, dict):
                 out.append(f"{pad}{k}:")
-                _render_json(x, sub, depth + 1, L, out, ind + 1)
+                _render_json(x, sub, depth + 1, L, out, ind + 1, cache)
             else:
-                _render_array(x, sub, depth + 1, L, out, ind, label=k)
+                _render_array(x, sub, depth + 1, L, out, ind, k, cache)
     elif isinstance(v, list):
-        _render_array(v, path, depth, L, out, ind, label=None)
+        _render_array(v, path, depth, L, out, ind, None, cache)
     else:
         out.append(f"{pad}{_fmt(v, L['str'])}")
 
 
-def _render_array(arr, path, depth, L, out, ind, label):
+def _render_array(arr, path, depth, L, out, ind, label, cache):
     pad = "  " * ind
     name = f"{label}: " if label is not None else ""
     n = len(arr)
@@ -513,27 +546,23 @@ def _render_array(arr, path, depth, L, out, ind, label):
         else:
             out.append(f"{pad}{name}array[{n}] at {path or '.'}: {_field_summary(arr, n, L['str'])}")
         return
-    dicts = [x for x in arr if isinstance(x, dict)]
-    out.append(f"{pad}{name}array[{n}] of {'objects' if len(dicts) == n else 'mixed'} at {path or '.'}")
+    flats, values, bad = _array_facts(arr, cache)
+    out.append(f"{pad}{name}array[{n}] of {'objects' if len(flats) == n else 'mixed'} at {path or '.'}")
     pad2 = pad + "  "
-    if dicts and depth < L["depth"] + 1:
-        flats = [_flatten(d) for d in dicts]
-        fields = {}
-        for f in flats:
-            for k in f:
-                fields.setdefault(k, None)
-        keys = list(fields)
+    if flats and depth < L["depth"] + 1:
+        keys = list(values)
         out.append(f"{pad2}fields ({len(keys)}):")
+        rare_below = max(1, 0.05 * len(flats)) if len(flats) >= 20 else 0
         shown = 0
         for k in keys:
-            vals = [f[k] for f in flats if k in f]
-            if len(vals) < max(1, 0.05 * len(flats)) and len(flats) >= 20:
+            vals = values[k]
+            if len(vals) < rare_below:
                 continue  # rare fields are listed separately
             if shown >= L["fields"]:
                 break
             out.append(f"{pad2}  {k}: {_field_summary(vals, len(flats), L['str'])}")
             shown += 1
-        common = [k for k in keys if not (len(flats) >= 20 and sum(k in f for f in flats) < max(1, 0.05 * len(flats)))]
+        common = [k for k in keys if len(values[k]) >= rare_below]
         if len(common) > shown:
             out.append(f"{pad2}  … +{len(common) - shown} more fields: {', '.join(common[shown:shown + 12])}")
         rare = [k for k in keys if k not in common]
@@ -541,12 +570,11 @@ def _render_array(arr, path, depth, L, out, ind, label):
             desc = []
             for k in rare[:6]:
                 idx = [i for i, f in enumerate(flats) if k in f][:4]
-                desc.append(f"{k} (in {sum(k in f for f in flats)} items, e.g. [{', '.join(map(str, idx))}])")
+                desc.append(f"{k} (in {len(values[k])} items, e.g. [{', '.join(map(str, idx))}])")
             out.append(f"{pad2}rare fields: {'; '.join(desc)}")
     if L["samples"]:
         out.append(f"{pad2}[0]:")
-        _render_json(arr[0], f"{path}[0]", depth + 1, L, out, ind + 2)
-    bad = [i for i, x in enumerate(arr) if _is_bad(x)]
+        _render_json(arr[0], f"{path}[0]", depth + 1, L, out, ind + 2, cache)
     if bad:
         out.append(f"{pad2}items that look like errors or failures: {len(bad)} (indexes {', '.join(map(str, bad[:12]))}{'…' if len(bad) > 12 else ''})")
         for i in bad[: L["bad"]]:
@@ -564,9 +592,10 @@ def squeeze_json(obj, budget, kind="json"):
         dict(depth=2, keys=8, fields=8, str=30, samples=0, bad=2, line=120),
     ]
     body = ""
+    cache = {}   # per-array facts shared by every detail level; obj is alive throughout, so ids are stable
     for L in levels:
         out = []
-        _render_json(obj, "", 0, L, out, 0)
+        _render_json(obj, "", 0, L, out, 0, cache)
         body = "\n".join(out)
         if est_tokens(body) <= budget:
             break
