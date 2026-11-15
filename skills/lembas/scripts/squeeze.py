@@ -12,7 +12,8 @@ Options:
     --stats         print size before and after to stderr
 
 Guarantees:
-    * Every error line, warning and stack trace is kept (repeats are counted, not dropped).
+    * Errors are never dropped silently. Each distinct error, warning and stack trace is shown (repeats are
+      counted), or, past the budget, the summary says how many more there are and how to list them.
     * Line numbers (L123) refer to the original, so you can grep or sed it for anything not shown.
     * The original is never modified. Piped input is saved to $LEMBAS_SQUEEZE_DIR (default
       $TMPDIR/lembas-squeeze, readable by you only) and the summary prints its path.
@@ -35,7 +36,7 @@ import sys
 import tempfile
 from collections import Counter
 
-VERSION = "1.0.0"
+VERSION = "1.0.0"   # this script's own version, printed by --version; not the Lembas release number
 DEFAULT_THRESHOLD = 2000
 DEFAULT_BUDGET = 1500
 MIN_SAVING = 0.30
@@ -52,6 +53,8 @@ DATA_TYPES = {"log", "json", "jsonl", "csv"}
 
 def est_tokens(text):
     # Logs, JSON and CSV tokenize at roughly 2.5 to 3.5 characters per token, so 3 is a safe estimate.
+    # ithildin.py uses 3.5 (documents) and scripts/count_tokens.py 4 (prose replies). All three
+    # undercount Chinese, Japanese and Korean text, which runs closer to one token per character.
     return (len(text) + 2) // 3
 
 

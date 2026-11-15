@@ -17,6 +17,8 @@ def make_counter(use_tiktoken):
         import tiktoken
         enc = tiktoken.get_encoding("cl100k_base")
         return lambda text: len(enc.encode(text))
+    # 4 characters per token suits English prose and is only used to compare two replies, so the error
+    # cancels out. squeeze.py (3) and ithildin.py (3.5) estimate denser text. CJK text is undercounted.
     return lambda text: round(len(text) / 4)
 
 

@@ -32,7 +32,7 @@ import tempfile
 import zipfile
 from xml.etree import ElementTree as ET
 
-VERSION = "1.0.0"
+VERSION = "1.0.0"   # this script's own version, printed by --version; not the Lembas release number
 DEFAULT_MAP_BUDGET = 2500
 DEFAULT_READ_TOKENS = 8000
 GIST_WORDS = 28
@@ -40,7 +40,8 @@ GIST_WORDS = 28
 
 def est_tokens(text):
     # About 3.5 characters per token: Claude's tokenizer splits code, numbers and symbols finely,
-    # so the usual 4 undercounts technical documents.
+    # so the usual 4 undercounts technical documents. squeeze.py uses 3 (logs and data) and
+    # scripts/count_tokens.py 4 (prose). All undercount Chinese, Japanese and Korean text.
     return (len(text) * 2 + 6) // 7
 
 
