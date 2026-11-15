@@ -2,7 +2,7 @@
 
 All text is outlined: GitHub serves README SVGs through <img>, which loads no fonts.
 """
-from lib import C, S, Leaf, n, render, svg, text_path, wordmark, write
+from lib import C, Leaf, n, render, svg, text_path, wordmark, write
 from logo import ithildin_body, lembas_body
 
 MONO, SANS, SANS_M = "JBMono-Medium", "Inter-Regular", "Inter-Medium"

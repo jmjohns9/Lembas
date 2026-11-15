@@ -1,5 +1,5 @@
 """Marks, wordmarks, lockups and the construction diagram for Lembas and Ithildin."""
-from lib import (ARC_R, C, GAP, LEAF_H, LEAF_L, R2, S, Leaf, n, render, svg, text_path,
+from lib import (ARC_R, C, GAP, LEAF_H, LEAF_L, R2, S, Leaf, n, svg, text_path,
                  wordmark, write)
 
 # Colour schemes: (mark colour, word colour). "color" is for light grounds.

@@ -6,7 +6,7 @@ Each panel is a nested <svg>, so it clips its own content and needs no transform
 import math
 
 from guidelines import ICONS
-from lib import ARC_R, C, R2, S, Leaf, n, render, svg, text_path, wordmark, write
+from lib import ARC_R, C, S, Leaf, n, render, svg, text_path, wordmark, write
 from logo import ithildin_body, lembas_body
 
 W, H, M, G = 2400, 1500, 64, 24

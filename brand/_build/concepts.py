@@ -50,7 +50,7 @@ if __name__ == "__main__":
             cells.append(f'<g transform="translate({n(cx + off)} {n(340 + off)}) scale({n(s)})">{body}</g>')
         d, _ = text_path(f"{chr(65 + i)}. {title}", "Inter-Medium", 18, x, 440)
         cells.append(f'<path fill="{BREAD}" d="{d}"/>')
-    sheet = svg(1000, 470, f'<rect width="1000" height="470" fill="#121c1e"/>' + "".join(cells),
+    sheet = svg(1000, 470, '<rect width="1000" height="470" fill="#121c1e"/>' + "".join(cells),
                 "Lembas logo concepts compared")
     write("previews/concepts-sheet.svg", sheet)
     render("previews/concepts-sheet.svg", "previews/concepts-sheet.png", 2000)

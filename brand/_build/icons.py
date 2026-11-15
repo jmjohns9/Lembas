@@ -1,7 +1,7 @@
 """Favicons, touch icon, app icon and GitHub avatar."""
 from PIL import Image
 
-from lib import BRAND, C, S, Leaf, n, render, svg, write
+from lib import BRAND, C, Leaf, n, render, svg, write
 from logo import SMALL_GAP, SMALL_K, lembas_body
 
 NIGHT, GOLD = C["anduin-night"], C["mallorn-gold"]
@@ -49,8 +49,6 @@ if __name__ == "__main__":
             z = im.resize((s * 8 if s < 48 else s * 4,) * 2, Image.NEAREST)
             sheet.paste(z, (x, 90), z)
             x += z.width + 20
-        for name, sz in (("apple-touch-icon-180", 120), ("icon-512", 120), ("github-avatar-500", 120)):
-            pass
     x = 20
     for name in ("apple-touch-icon-180", "icon-512", "github-avatar-500"):
         im = Image.open(f"{BRAND}/icons/{name}.png").convert("RGBA").resize((160, 160), Image.LANCZOS)
