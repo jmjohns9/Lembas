@@ -586,7 +586,6 @@ class I30_HeadingsMayEndInAHash(unittest.TestCase):
         self.assertEqual([h["title"] for h in doc.headings], ["C#", "F# and C#", "Closed", "Single", "Issue #42"])
 
 
-@pending("test_adjacent_hits_are_both_marked")
 class I31_EveryHitIsMarkedWithContext(unittest.TestCase):
     def test_adjacent_hits_are_both_marked(self):
         path = md("i31.md", "# Notes\n\nfirst alpha line\n\nsecond alpha line\n\nthird plain line\n")

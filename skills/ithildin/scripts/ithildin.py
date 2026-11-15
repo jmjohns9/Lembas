@@ -1003,6 +1003,7 @@ def render_find(doc, patterns, regex, limit, context):
                        (f" ({', '.join(secs[:12])}{', …' if len(secs) > 12 else ''})" if secs and secs != ['-'] else ""))
         out.append(f"== {label!r} ({len(hits)} hits)")
         shown = set()
+        listed = set(hits[:limit])   # a hit already printed as context for the one before it is still a hit
         for i in hits[:limit]:
             s = section_of(doc, i)
             sid = f"§{s['id']}" if s else ""
@@ -1011,7 +1012,7 @@ def render_find(doc, patterns, regex, limit, context):
                 if j in shown:
                     continue
                 shown.add(j)
-                mark = ">" if j == i else " "
+                mark = ">" if j in listed else " "
                 out.append(f"{mark}{loc(doc, j)} {sid} | {doc.lines[j][1][:240]}")
         if len(hits) > limit:
             out.append(f"  … {len(hits) - limit} more; narrow the pattern or raise -n.")
