@@ -673,7 +673,6 @@ class I43_NumberedHeadingsThatOpenEveryPage(unittest.TestCase):
         self.assertEqual(sum(t.endswith(f"Chapter {p}") for p, t in doc.lines), 6)
 
 
-@pending("test_same_bytes_with_different_extensions_are_parsed_separately")
 class I44_CacheKeyIncludesTheFileType(unittest.TestCase):
     def test_same_bytes_with_different_extensions_are_parsed_separately(self):
         text = "# Title\n\nBody text shared by both files.\n"

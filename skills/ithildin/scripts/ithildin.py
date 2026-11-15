@@ -733,6 +733,7 @@ def load(path):
             h.update(chunk)
     with open(os.path.abspath(__file__), "rb") as f:
         h.update(f.read())   # a new script version never reuses an old cache entry
+    h.update(os.path.splitext(path)[1].lower().encode())   # the extension picks the parser
     cpath = os.path.join(cache_dir(), h.hexdigest() + ".json")
     if os.path.exists(cpath):
         try:
