@@ -23,6 +23,10 @@ import os
 import re
 import sys
 
+# The hook runs on every Bash and Read call. When it is switched off, stop before importing anything else.
+if __name__ == "__main__" and os.environ.get("LEMBAS_SQUEEZE", "1") == "0" and "--print-settings" not in sys.argv:
+    sys.exit(0)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 import squeeze  # noqa: E402

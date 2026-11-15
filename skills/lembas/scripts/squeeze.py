@@ -22,9 +22,7 @@ Guarantees:
 
 Standard library only. Python 3.8+.
 """
-import argparse
 import csv
-import hashlib
 import heapq
 import io
 import json
@@ -32,9 +30,7 @@ import math
 import os
 import re
 import stat
-import statistics
 import sys
-import tempfile
 from collections import Counter
 from functools import lru_cache
 
@@ -685,6 +681,7 @@ def _profile_column(vals, line_nos, str_len):
             # fsum is correctly rounded. Plain sum() on floats is only accurate from Python 3.12, so
             # using it would make the same file print different totals on different versions.
             total = sum(nums) if kind == "int" else math.fsum(nums)
+            import statistics   # here, not at the top: the hook imports this module on every tool call
             summary = (f"min {fmt(lo)}, max {fmt(hi)}, mean {fmt(statistics.fmean(nums))}, "
                        f"median {fmt(statistics.median(nums))}, sum {fmt(total)}")
             if len(distinct) <= 6:
@@ -820,6 +817,7 @@ def _private_temp_dir(name):
 
     The temp folder is shared, so another user could have made a folder of that name first and would
     then be able to read everything written into it. Such a folder is not used: a new private one is."""
+    import tempfile
     d = os.path.join(tempfile.gettempdir(), name)
     os.makedirs(d, mode=0o700, exist_ok=True)
     if hasattr(os, "getuid"):
@@ -838,6 +836,7 @@ def _cache_path(text, kind, cache_dir=None):
     out, and quoted in a summary, before anything is written."""
     cache_dir = cache_dir or os.environ.get("LEMBAS_SQUEEZE_DIR") or _private_temp_dir("lembas-squeeze")
     ext = {"log": ".log", "json": ".json", "jsonl": ".jsonl", "csv": ".csv"}.get(kind, ".txt")
+    import hashlib
     return os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
 
 
@@ -949,6 +948,7 @@ def _write(stream, text):
 
 
 def main(argv=None):
+    import argparse
     ap = argparse.ArgumentParser(description="Shrink large logs, JSON and CSV before an LLM reads them.")
     ap.add_argument("file", nargs="?", default="-")
     ap.add_argument("--type", default="auto", choices=["auto", "log", "json", "jsonl", "csv", "text"])
