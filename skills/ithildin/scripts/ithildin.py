@@ -455,7 +455,8 @@ def extract_markdown(path, text=None, kind="Markdown"):
             flush_table()
         if not line.strip():
             continue
-        m = None if fence else re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
+        # A closing run of #s counts only after a space, so "C#" keeps its #.
+        m = None if fence else re.match(r"^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$", line)
         if m:
             title = m.group(2).strip()
             n = re.match(r"^(\d+(?:\.\d+)*)\.?\s+", title)

@@ -579,7 +579,6 @@ class I15_CacheFoldersArePrivateAndRespectful(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(os.stat(loose).st_mode), 0o700)
 
 
-@pending("test_closing_hashes_need_a_space_before_them")
 class I30_HeadingsMayEndInAHash(unittest.TestCase):
     def test_closing_hashes_need_a_space_before_them(self):
         text = "# C#\n\na\n\n## F# and C#\n\nb\n\n## Closed ##\n\nc\n\n### Single #\n\nd\n\n## Issue #42\n\ne\n"
