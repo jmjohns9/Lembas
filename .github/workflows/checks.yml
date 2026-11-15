@@ -53,12 +53,15 @@ jobs:
           unzip -l dist/ithildin.skill | grep -q 'ithildin/scripts/ithildin.py'
 
   # The skills need only the standard library. Run the suite with nothing installed, on the oldest
-  # and newest Python versions, so a newer-only feature or a hidden dependency shows up here.
+  # available Python and a recent one, so a newer-only feature or a hidden dependency shows up here.
   stdlib:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false   # one version failing should not cancel the others
       matrix:
-        python-version: ["3.9", "3.13"]
+        # 3.10 is the oldest version setup-python offers on ubuntu-latest (Ubuntu 26.04).
+        # 3.8 and 3.9 are checked locally; the runners no longer provide them.
+        python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 

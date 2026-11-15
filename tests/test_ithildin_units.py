@@ -426,10 +426,11 @@ class Cache(unittest.TestCase):
 
     def test_default_folder_is_under_the_system_temp_folder(self):
         import tempfile
-        with mock.patch.dict(os.environ):
+        tmp = tempfile.mkdtemp()      # a fresh temp folder, so the test does not depend on what /tmp holds
+        with mock.patch.dict(os.environ), mock.patch.object(tempfile, "gettempdir", return_value=tmp):
             del os.environ["ITHILDIN_CACHE"]
-            with mock.patch("os.makedirs"), mock.patch("os.chmod"):
-                self.assertEqual(ithildin.cache_dir(), os.path.join(tempfile.gettempdir(), "ithildin"))
+            self.assertEqual(ithildin.cache_dir(), os.path.join(tmp, "ithildin"))
+        self.assertTrue(os.path.isdir(os.path.join(tmp, "ithildin")))
 
     def test_second_load_comes_from_the_cache(self):
         path = path_of("cached.md", MD)
