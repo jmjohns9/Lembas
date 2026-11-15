@@ -789,8 +789,6 @@ class I18_CountTokensReportsBadInput(unittest.TestCase):
         self.assertIn("lembas   8/8 checks passed", r.stdout.decode())
 
 
-@pending("test_generate_replies_records_a_failed_call_and_carries_on",
-         "test_squeeze_benchmark_removes_its_work_folder_after_a_failure")
 class I38_BenchmarkRunnersSurviveAFailedRun(unittest.TestCase):
     def test_generate_replies_records_a_failed_call_and_carries_on(self):
         evals = support.write(support.tmp("regressions", "i38", "evals.json"), json.dumps({"evals": [

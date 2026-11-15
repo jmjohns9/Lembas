@@ -116,10 +116,11 @@ def run_one(task, arm, rep, fixtures):
         r = json.loads(p.stdout)
     except Exception as exc:  # record the failure instead of losing the whole batch
         return {"task": task["id"], "arm": arm, "rep": rep, "error": repr(exc)[:300]}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)   # also after a timeout, so failed runs leave no copies behind
     u = r.get("usage", {})
     answer = r.get("result", "") or ""
     total_in = u.get("input_tokens", 0) + u.get("cache_creation_input_tokens", 0) + u.get("cache_read_input_tokens", 0)
-    shutil.rmtree(work, ignore_errors=True)
     return {"task": task["id"], "arm": arm, "rep": rep, "seconds": round(time.time() - t0, 1),
             "input_tokens": u.get("input_tokens", 0), "cache_write": u.get("cache_creation_input_tokens", 0),
             "cache_read": u.get("cache_read_input_tokens", 0), "total_input": total_in,
