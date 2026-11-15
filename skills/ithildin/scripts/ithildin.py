@@ -15,6 +15,7 @@ Standard library only; uses pdftotext, pypdf and pdfplumber when they are availa
 Nothing is sent anywhere.
 """
 import argparse
+import bisect
 import hashlib
 import html
 import html.parser
@@ -813,6 +814,18 @@ def section_of(doc, line_idx):
     return best
 
 
+def _section_finder(doc):
+    """section_of for many lines: a binary search instead of a scan of every heading per line."""
+    starts = [h["line"] for h in doc.headings]
+    if any(a > b for a, b in zip(starts, starts[1:])):   # every extractor sorts them, but be sure
+        return lambda i: section_of(doc, i)
+
+    def find(i):
+        k = bisect.bisect_right(starts, i)
+        return doc.headings[k - 1] if k else None
+    return find
+
+
 def render_map(doc, budget, depth=None):
     total_words = sum(words(t) for _, t in doc.lines)
     total_tokens = est_tokens("\n".join(t for _, t in doc.lines))
@@ -987,6 +1000,7 @@ def render_find(doc, patterns, regex, limit, context):
             sys.exit(f"ithildin: invalid regular expression {p!r}: {exc}. Drop --regex to search for it as plain text.")
     out = []
     summary = []
+    section_at = _section_finder(doc)
     for label, rx in compiled:
         hits = []
         for i, (_, t) in enumerate(doc.lines):
@@ -997,7 +1011,7 @@ def render_find(doc, patterns, regex, limit, context):
                     hits.append(i)   # the phrase wraps onto the next line
         secs = []
         for i in hits:
-            s = section_of(doc, i)
+            s = section_at(i)
             sid = s["id"] if s else "-"
             if sid not in secs:
                 secs.append(sid)
@@ -1007,7 +1021,7 @@ def render_find(doc, patterns, regex, limit, context):
         shown = set()
         listed = set(hits[:limit])   # a hit already printed as context for the one before it is still a hit
         for i in hits[:limit]:
-            s = section_of(doc, i)
+            s = section_at(i)
             sid = f"§{s['id']}" if s else ""
             lo, hi = max(0, i - context), min(len(doc.lines), i + context + 1)
             for j in range(lo, hi):

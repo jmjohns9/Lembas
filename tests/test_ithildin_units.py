@@ -864,5 +864,26 @@ class Main(unittest.TestCase):
         self.assertIn("Run map to see ids", r.stderr.decode("utf-8"))
 
 
+
+class SectionFinder(unittest.TestCase):
+    def doc(self, starts):
+        doc = ithildin.Doc("x.md", "Markdown")
+        doc.headings = [{"line": n, "id": f"S{i}"} for i, n in enumerate(starts, 1)]
+        return doc
+
+    def test_agrees_with_section_of_on_every_line(self):
+        for starts in ([], [0], [3], [0, 0, 5, 9], [2, 4, 4, 7, 30]):
+            doc = self.doc(starts)
+            find = ithildin._section_finder(doc)
+            for i in range(40):
+                self.assertIs(find(i), ithildin.section_of(doc, i), (starts, i))
+
+    def test_unsorted_headings_fall_back_to_section_of(self):
+        doc = self.doc([5, 2, 9])
+        find = ithildin._section_finder(doc)
+        for i in range(12):
+            self.assertIs(find(i), ithildin.section_of(doc, i), i)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
