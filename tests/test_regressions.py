@@ -522,7 +522,6 @@ class I13_ReadRangesAreChecked(unittest.TestCase):
         self.assertNotIn("Not read yet", text)
 
 
-@pending("test_depth_one_shows_the_top_level_even_when_that_is_a_second_level_heading")
 class I14_DepthCountsFromTheShallowestHeading(unittest.TestCase):
     def test_depth_one_shows_the_top_level_even_when_that_is_a_second_level_heading(self):
         text = "".join(f"## Part {i}\n\nText for part {i}.\n\n### Detail {i}\n\nMore.\n\n" for i in range(1, 6))

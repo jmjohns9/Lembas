@@ -811,7 +811,9 @@ def render_map(doc, budget, depth=None):
         return "\n".join(out)
 
     levels = sorted({h["level"] for h in doc.headings})
-    max_level = depth or levels[-1]
+    # --depth counts the levels this document uses, from its shallowest. A file whose top headings
+    # are "##" has no level 1, so comparing with the raw level would show nothing for --depth 1.
+    max_level = levels[min(depth, len(levels)) - 1] if depth and depth > 0 else levels[-1]
 
     def build(max_lvl, gist_lvl):
         rows = []
