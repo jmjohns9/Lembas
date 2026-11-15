@@ -25,6 +25,7 @@ Standard library only. Python 3.8+.
 import argparse
 import csv
 import hashlib
+import heapq
 import io
 import json
 import math
@@ -634,6 +635,17 @@ def _num_value(s):
     return float(s) if FLOAT_RE.match(s) else None
 
 
+def _num_values(cells):
+    """Every cell as a number, or None as soon as one is not. Each cell is parsed once."""
+    out = []
+    for v in cells:
+        x = _num_value(v)
+        if x is None:
+            return None
+        out.append(x)
+    return out
+
+
 def _numfmt(x):
     if isinstance(x, int):
         return f"{x:,}"                 # exact at any size; a float would round an 18-digit ID
@@ -644,26 +656,22 @@ def _numfmt(x):
 
 def _profile_column(vals, line_nos, str_len):
     total = len(vals)
-    present = [(v.strip(), ln) for v, ln in zip(vals, line_nos) if v.strip().lower() not in NULLS]
+    present = [(s, ln) for s, ln in ((v.strip(), ln) for v, ln in zip(vals, line_nos)) if s.lower() not in NULLS]
     nulls = total - len(present)
     p = [v for v, _ in present]
     if not p:
         return "empty", nulls, "all null", []
     if all(INT_RE.match(v) for v in p):
         kind = "int"
-    elif all(_num_value(v) is not None for v in p):
-        kind = "float"
-    elif all(DATE_RE.match(v) for v in p):
-        kind = "date"
-    elif all(v.lower() in BOOL for v in p):
-        kind = "bool"
+        # Whole-number columns stay integers, so IDs and counts beyond 2**53 keep every digit.
+        nums = [int(v) for v in p]
     else:
-        kind = "text"
+        nums = _num_values(p)
+        kind = ("float" if nums is not None else "date" if all(DATE_RE.match(v) for v in p)
+                else "bool" if all(v.lower() in BOOL for v in p) else "text")
     distinct = Counter(p)
     flags = []
     if kind in ("int", "float"):
-        # Whole-number columns stay integers, so IDs and counts beyond 2**53 keep every digit.
-        nums = [int(v) for v in p] if kind == "int" else [_num_value(v) for v in p]
         lo, hi = min(nums), max(nums)
         fmt = _numfmt
         unique = len(distinct) == len(p)
@@ -679,12 +687,16 @@ def _profile_column(vals, line_nos, str_len):
                 summary = ", ".join(f"{v}×{c}" for v, c in distinct.most_common()) + "; " + summary
             # Flag a value only when it is far from everything else (a shifted decimal, a sentinel
             # like -1 or 999999). Skewed but real distributions don't trigger this.
-            ranked = sorted(zip(nums, (ln for _, ln in present)), key=lambda t: t[0])
-            if len(ranked) >= 10:
-                (top, top_ln), (nxt, _) = ranked[-1], ranked[-2]
+            # Only the two largest and two smallest are needed, so no full sort. Ties go to the last
+            # maximum and the first minimum, by position in the file.
+            if len(nums) >= 10:
+                order = range(len(nums))
+                i_top, i_nxt = heapq.nlargest(2, order, key=lambda i: (nums[i], i))
+                top, top_ln, nxt = nums[i_top], present[i_top][1], nums[i_nxt]
                 if nxt > 0 and top >= 5 * nxt:
                     flags.append(f"max {fmt(top)} at L{top_ln} is {top / nxt:,.1f}× the next largest ({fmt(nxt)})")
-                (bot, bot_ln), (nxt_lo, _) = ranked[0], ranked[1]
+                i_bot, i_nxt = heapq.nsmallest(2, order, key=lambda i: (nums[i], i))
+                bot, bot_ln, nxt_lo = nums[i_bot], present[i_bot][1], nums[i_nxt]
                 if bot < 0 <= nxt_lo:
                     flags.append(f"min {fmt(bot)} at L{bot_ln} is the only negative value")
     elif kind == "date":
