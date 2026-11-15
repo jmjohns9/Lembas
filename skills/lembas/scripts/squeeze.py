@@ -187,10 +187,11 @@ ERR = re.compile(
     r"timed out|timeout)" + _ALONE_R +
     r"|(?-i:[A-Za-z]+(?:Error|Exception))\b|\"\s5\d\d\s|\bHTTP/\d(?:\.\d)?\"?\s5\d\d\b"
 )
-WARN = re.compile(
-    r"(?i)" + _ALONE_L + r"(warn|warning|warnings|deprecated|deprecation|retry|retrying)" + _ALONE_R +
-    r"|(?-i:[A-Za-z]+Warning)\b|\"\s4\d\d\s"      # UserWarning, ResourceWarning: named like FooError above
-)
+WARN = re.compile(r"(?i)" + _ALONE_L + r"(warn|warning|warnings|deprecated|deprecation|retry|retrying)" + _ALONE_R +
+                  r"|\"\s4\d\d\s")
+# UserWarning, ResourceWarning: named like FooError above. A separate pattern, tried only on lines that
+# contain "Warning": inside WARN it was tried at every position of every line, 9% of a log's squeeze time.
+WARNING_CLASS = re.compile(r"[A-Za-z]Warning\b")
 NOT_ERR = re.compile(
     r"(?i)\b(0|no) (errors?|failures?|failed)\b|\berrors?\s*[=:]\s*0\b|\bfailed\s*[=:]\s*0\b|\bwithout errors?\b"
 )
@@ -240,7 +241,7 @@ def _severity(line):
         return 2
     if ERR.search(line) and not NOT_ERR.search(line):
         return 2
-    if WARN.search(line):
+    if WARN.search(line) or ("Warning" in line and WARNING_CLASS.search(line)):
         return 1
     return 0
 
