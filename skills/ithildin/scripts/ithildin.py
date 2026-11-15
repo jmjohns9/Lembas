@@ -56,7 +56,7 @@ def clip_words(text, n):
 
 
 def norm(s):
-    return re.sub(r"\s+", " ", s).strip()
+    return " ".join(s.split())   # same as collapsing \s+ to one space and stripping, and much faster
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +433,13 @@ def extract_pptx(path):
     return doc
 
 
+MD_FENCE = re.compile(r"^\s*(```|~~~)")
+MD_TABLE_RULE = re.compile(r"^\s*\|?\s*:?-{2,}")
+# A closing run of #s counts only after a space, so "C#" keeps its #.
+MD_HEADING = re.compile(r"^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$")
+SECTION_NUMBER = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+")
+
+
 def extract_markdown(path, text=None, kind="Markdown"):
     doc = Doc(path, kind)
     if text is None:
@@ -444,14 +451,14 @@ def extract_markdown(path, text=None, kind="Markdown"):
 
     def flush_table():
         rows = [[norm(c) for c in r.strip().strip("|").split("|")] for r in pending
-                if not re.match(r"^\s*\|?\s*:?-{2,}", r)]
+                if not MD_TABLE_RULE.match(r)]
         pending.clear()
         if rows:
             _add_table(doc, rows)
 
     for raw in text.splitlines():
         line = raw.rstrip()
-        if re.match(r"^\s*(```|~~~)", line):
+        if MD_FENCE.match(line):
             fence = not fence
         if not fence and line.lstrip().startswith("|") and line.rstrip().endswith("|"):
             pending.append(line)
@@ -460,11 +467,10 @@ def extract_markdown(path, text=None, kind="Markdown"):
             flush_table()
         if not line.strip():
             continue
-        # A closing run of #s counts only after a space, so "C#" keeps its #.
-        m = None if fence else re.match(r"^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$", line)
+        m = None if fence else MD_HEADING.match(line)
         if m:
             title = m.group(2).strip()
-            n = re.match(r"^(\d+(?:\.\d+)*)\.?\s+", title)
+            n = SECTION_NUMBER.match(title)
             doc.headings.append({"line": len(doc.lines), "level": len(m.group(1)),
                                  "num": n.group(1) if n else "", "title": title})
             doc.add(title)
