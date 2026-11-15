@@ -91,8 +91,21 @@ def _pdf_reader(path):
     return PdfReader(path)
 
 
+def _reader_once(path):
+    """A function returning one shared pypdf reader for `path`, opened on first use. A PDF can need
+    it three times (text fallback, bookmarks, type sizes), and parsing the file is the slow part."""
+    opened = []
+
+    def get():
+        if not opened:
+            opened.append(_pdf_reader(path))
+        return opened[0]
+    return get
+
+
 def extract_pdf(path):
     doc = Doc(path, "PDF")
+    reader = _reader_once(path)
     pages = None
     if shutil.which("pdftotext"):
         try:
@@ -106,8 +119,7 @@ def extract_pdf(path):
                 pages = pages[:-1]
     if pages is None:
         try:
-            reader = _pdf_reader(path)
-            pages = [(p.extract_text() or "") for p in reader.pages]
+            pages = [(p.extract_text() or "") for p in reader().pages]
         except ImportError:
             sys.exit("ithildin: reading PDF needs pdftotext (poppler-utils) or `pip install pypdf`.")
         except Exception as exc:
@@ -122,18 +134,18 @@ def extract_pdf(path):
         doc.notes.append("Little or no text layer: this looks like a scanned PDF. OCR it first "
                          "(for example `ocrmypdf in.pdf out.pdf`) or read pages as images.")
     _strip_running_lines(doc)
-    _pdf_outline(doc)
+    _pdf_outline(doc, reader)
     if not doc.headings:
-        _pdf_font_headings(doc)
+        _pdf_font_headings(doc, reader=reader)
     return doc
 
 
-def _pdf_font_headings(doc, max_pages=2000):
+def _pdf_font_headings(doc, max_pages=2000, reader=None):
     """Headings from type size: lines set noticeably larger than the body text."""
     if doc.pages > max_pages:
         return
     try:
-        reader = _pdf_reader(doc.path)
+        reader = reader() if reader else _pdf_reader(doc.path)
     except Exception:      # pypdf is not installed, or the file is damaged
         return
     runs = []          # (page, size, text)
@@ -235,9 +247,9 @@ def _strip_running_lines(doc):
     doc.lines = [doc.lines[i] for i in keep]
 
 
-def _pdf_outline(doc):
+def _pdf_outline(doc, reader=None):
     try:
-        reader = _pdf_reader(doc.path)
+        reader = reader() if reader else _pdf_reader(doc.path)
         outline = reader.outline
     except Exception:      # pypdf is not installed, or the file is damaged
         return
