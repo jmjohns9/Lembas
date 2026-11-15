@@ -636,8 +636,7 @@ class RenderMap(unittest.TestCase):
         text = "# Terms\n\n" + "\n\n".join(f'"Term {chr(65 + i // 26)}{chr(65 + i % 26)}" means thing {i}.' for i in range(35))
         self.assertIn(", … 5 more", ithildin.render_map(doc_of("terms35.md", text), 2500))
 
-    def test_rel_min_and_label(self):
-        self.assertEqual(ithildin.rel_min([3, 1, 2]), 1)
+    def test_label(self):
         self.assertEqual(ithildin._label({"id": "7.3", "title": "7.3 Limits"}), "7.3 Limits")
         self.assertEqual(ithildin._label({"id": "S4", "title": "Limits"}), "S4 Limits")
 

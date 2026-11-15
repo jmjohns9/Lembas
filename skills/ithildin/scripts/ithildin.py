@@ -71,6 +71,7 @@ class Doc:
         self.tables = []       # dicts: line, caption, rows (optional, for DOCX/PPTX)
         self.outline_source = "none"
         self.notes = []
+        self.terms = []        # dicts: term, line (defined terms, filled in by finish)
 
     def add(self, text, page=None):
         self.lines.append([page, text])
@@ -798,11 +799,7 @@ def loc(doc, line_idx):
 
 def span(doc, start, end):
     a, b = loc(doc, start), loc(doc, max(start, end - 1))
-    if a == b:
-        return a
-    if a.startswith("p") and b.startswith("p"):
-        return f"{a}-{b[1:]}"
-    return f"{a}-{b[1:]}"
+    return a if a == b else f"{a}-{b[1:]}"
 
 
 def section_of(doc, line_idx):
@@ -873,8 +870,9 @@ def render_map(doc, budget, depth=None):
             lines.append(txt)
         return lines
 
-    plans = [(max_level, max_level)] + [(lvl, g) for lvl in range(max_level, rel_min(levels) - 1, -1)
-                                        for g in range(lvl, rel_min(levels) - 2, -1)]
+    top = levels[0]
+    plans = [(max_level, max_level)] + [(lvl, g) for lvl in range(max_level, top - 1, -1)
+                                        for g in range(lvl, top - 2, -1)]
     body = None
     for max_lvl, gist_lvl in plans:
         body = build(max_lvl, gist_lvl)
@@ -882,7 +880,7 @@ def render_map(doc, budget, depth=None):
             break
     if est_tokens("\n".join(body)) > budget * 0.8:
         body = body[: max(10, int(len(body) * (budget * 0.8) / max(est_tokens("\n".join(body)), 1)))]
-        body.append(f"… outline cut to fit the budget; use --depth or find for the rest.")
+        body.append("… outline cut to fit the budget; use --depth or find for the rest.")
     out.extend(body)
     rest = budget - est_tokens("\n".join(out))
     if tables or figures:
@@ -898,10 +896,6 @@ def render_map(doc, budget, depth=None):
         terms = ", ".join(f"{t['term']} ({loc(doc, t['line'])})" for t in doc.terms[:30])
         out.append(f"Defined terms: {terms}" + (f", … {len(doc.terms) - 30} more" if len(doc.terms) > 30 else ""))
     return "\n".join(out)
-
-
-def rel_min(levels):
-    return min(levels)
 
 
 def _label(h):
