@@ -5,18 +5,30 @@
 </picture>
 
 [![Checks](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml/badge.svg)](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml)
-[![Release](https://img.shields.io/github/v/release/jmjohns9/lembas?style=flat-square&labelColor=0E1719&color=7D5F16)](https://github.com/jmjohns9/lembas/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3E5C47?style=flat-square&labelColor=0E1719)](LICENSE)
 
-**A Claude skill for short, dense engineering answers: the problem, the fix, the alternatives and why the fix wins.**
+# Lembas
+
+**Claude skills that spend fewer tokens: short, dense engineering answers, compressed logs and data, and long documents read one section at a time.**
+
+## What is Lembas
 
 In *The Lord of the Rings*, one small bite of elven bread called lembas feeds a traveler for a day. Lembas answers work the same way: small, because every sentence carries something you need.
 
 Most of a typical AI reply isn't the answer. It's setup, a restated question, hedging, background nobody asked for and an offer to help. Lembas cuts those. What's left reads like a staff engineer's code review comment: the root cause, the exact fix and how to confirm it, the alternatives with when each one wins, and the trade-off that decides it.
 
-Version 2.0 also cuts what Claude **reads**. It queries large files before reading them, and it ships a compressor that turns a 24,000-line log into a 1,500-token summary that keeps every error.
+Lembas also cuts what Claude **reads**. It queries large files before reading them, and it ships `squeeze.py`, which turns a 24,000-line log into a summary of about 1,300 tokens that keeps every distinct error. The repository holds a second skill, **Ithildin**, for long documents: it maps a 400-page book in about 2,000 tokens, then reads only the sections a question needs.
 
-The repo also holds a second skill, **[Ithildin](#ithildin-long-documents)**, for long documents. It maps a 400-page book in about 2,000 tokens, then reads only the sections a question needs.
+New to tokens and context windows? [docs/HOW_LEMBAS_WORKS.md](docs/HOW_LEMBAS_WORKS.md) explains them and walks through the code.
+
+## Key features
+
+- **Answers you can act on at once.** Every reply to a problem names the cause, gives the exact fix and how to confirm it, weighs the alternatives and says why the fix wins. Code, commands, paths and numbers are never shortened.
+- **About 60% shorter replies.** No greetings, recaps or offers of help, and word budgets per kind of question. On the benchmark below, replies were 61% to 62% shorter than with no prompt, and more complete in blind review than the alternatives tested.
+- **Complete where it matters.** Safety warnings, irreversible actions, multi-step procedures and anything saved outside the chat keep every step.
+- **Big logs, JSON and CSV in a page.** `squeeze.py` keeps every distinct error and warning, counts repeats, profiles columns, flags outliers and points to the full original by line number, so exact answers are one `sed` away.
+- **Long documents without reading them whole.** Ithildin maps PDFs, Word files, decks, Markdown and HTML, finds terms with their page and section, and reads one section at a time, with page citations.
+- **Nothing to install, nothing sent anywhere.** Both scripts are standard-library Python 3.8+ and run locally. Optional libraries improve PDF reading.
 
 ## Results
 
@@ -32,7 +44,43 @@ Caveman's 10 developer questions, 2 runs, Claude Opus 5.5, counted with Claude's
 
 **Input tokens.** `squeeze.py` shrinks large logs, JSON and CSV by 95% to 99.8%. In end-to-end Claude Code runs on Opus 5.5, the skill cut total input by 10% to 15% and cost by 10% to 19%, with every answer correct. The optional hook cut input by 25% on Haiku 4.5. See [docs/SQUEEZE.md](docs/SQUEEZE.md).
 
-## Example
+**Long documents.** On six questions about a 126-page manual and a 395-page book, Ithildin cut input by 26% and turns by a third in Claude Code, with every answer correct in both arms. See [docs/ITHILDIN.md](docs/ITHILDIN.md).
+
+## Quick start
+
+**Claude Code:**
+
+```bash
+git clone https://github.com/jmjohns9/lembas.git
+cp -r lembas/skills/lembas ~/.claude/skills/
+cp -r lembas/skills/ithildin ~/.claude/skills/    # optional: long documents
+```
+
+Start a session and type `/lembas` or "lembas mode". It stays on until you say "stop lembas" or "normal mode". Ithildin triggers on its own when you ask about a long document, or with `/ithildin`.
+
+**Claude apps (claude.ai, desktop):** build the skill files, then open each in Claude and click **Save skill**:
+
+```bash
+git clone https://github.com/jmjohns9/lembas.git
+cd lembas
+bash scripts/package.sh          # writes dist/lembas.skill and dist/ithildin.skill
+```
+
+The two skills are independent; install either or both.
+
+**Optional Claude Code hook.** It squeezes large Bash and Read results automatically. It is worth it on smaller models or with raised output limits; see [docs/SQUEEZE.md](docs/SQUEEZE.md#should-you-install-the-hook).
+
+```bash
+python3 ~/.claude/skills/lembas/hooks/squeeze_hook.py --print-settings
+```
+
+Merge the JSON it prints into `~/.claude/settings.json`.
+
+## Usage examples
+
+The examples use test files the repository generates, so you can run them as written.
+
+### 1. A reply in Lembas mode
 
 **Prompt:** *My cron job works when I run it by hand but does nothing under cron.*
 
@@ -46,93 +94,173 @@ Caveman's 10 developer questions, 2 runs, Claude Opus 5.5, counted with Claude's
 
 Concept questions ("What's the difference between X and Y?") skip the labels: the mechanism, when to use each, and the common trap. More replies are in [evals/results/v2.0.0](evals/results/v2.0.0).
 
-## Install
-
-**Claude apps (claude.ai, desktop):** download [`lembas.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/lembas.skill) and, for long documents, [`ithildin.skill`](https://github.com/jmjohns9/lembas/releases/latest/download/ithildin.skill) from the [latest release](https://github.com/jmjohns9/lembas/releases/latest). Open each in Claude and click **Save skill**. The two skills are independent; install either or both. To build them yourself, run `scripts/package.sh`.
-
-**Claude Code:**
+### 2. Squeeze a 24,000-line log
 
 ```bash
-git clone https://github.com/jmjohns9/lembas.git
-cp -r lembas/skills/lembas ~/.claude/skills/
-cp -r lembas/skills/ithildin ~/.claude/skills/    # optional: long documents
+python3 tests/make_fixtures.py /tmp/lembas-demo
+python3 skills/lembas/scripts/squeeze.py /tmp/lembas-demo/app.log --stats
 ```
 
-**Optional Claude Code hook** (squeezes large tool outputs automatically; worth it on smaller models or with raised output limits, see [docs/SQUEEZE.md](docs/SQUEEZE.md#should-you-install-the-hook)):
+Expected output (middle lines left out here):
+
+```
+[lembas squeeze: log, 24,007 lines, 235 error lines (2 distinct), 357 warnings. ~633,419 tokens shown as a summary. Full original: /tmp/lembas-demo/app.log ; grep -n or sed -n 'A,Bp' the original for any line range. Lines marked L123 are original line numbers.]
+L1 2026-10-14 08:00:00,000 INFO  [http] GET /api/search 200 5ms rid=361424b1ea125c50
+...
+L266 2026-10-14 08:05:57,750 WARN  [db] slow query 1433ms: SELECT * FROM orders WHERE status = $1
+      [this warning repeats 124× in total, last at L23952]
+  … L267–L15873: 15607 lines collapsed (see summary below)
+L15874 2026-10-14 13:57:08,550 ERROR [payment-worker-3] Unhandled exception while settling order 88412
+L15875 Traceback (most recent call last):
+L15876   File "/srv/app/payments/settle.py", line 142, in settle_order
+L15877     customer = order.payload['customer_id']
+L15878   File "/srv/app/payments/models.py", line 57, in __getitem__
+L15879     return self._data[key]
+L15880 KeyError: 'customer_id'
+L15881 2026-10-14 13:57:09,900 ERROR [cache] redis.exceptions.ConnectionError: Error 111 connecting to 10.0.4.17:6379. Connection refused.
+      [this error repeats 234× in total, last at L16347]
+...
+Collapsed lines: 23389 lines in 7 patterns. Most common (count × first example):
+  5431× L8 2026-10-14 08:00:09,450 DEBUG [cache] hit key=user:5959 ttl=11s
+  ...
+squeeze: log, ~633,419 → ~1,252 tokens (100% smaller)
+```
+
+The last line goes to standard error. The count after the arrow varies by a few tokens with the length of the file's path. Piped output works the same way: `npm test 2>&1 | python3 skills/lembas/scripts/squeeze.py`.
+
+### 3. Profile a CSV and catch an outlier
 
 ```bash
-python3 ~/.claude/skills/lembas/hooks/squeeze_hook.py --print-settings
+python3 skills/lembas/scripts/squeeze.py /tmp/lembas-demo/sales.csv
 ```
 
-Merge the JSON it prints into `~/.claude/settings.json`.
+Expected output (start):
 
-## Use
+```
+[lembas squeeze: csv, 9,000 rows × 7 columns. ~140,526 tokens shown as a summary. Full original: /tmp/lembas-demo/sales.csv ; compute exact sums, counts and filters on the original (pandas, csvkit, awk). Lines marked L123 are original line numbers.]
+columns (7), 9,000 data rows:
+  date (date): 2026-01-01 … 2027-01-10, 375 distinct
+  region (text): "East"×2274, "West"×2256, "South"×2252, "North"×2218
+  rep (text, 12 null): 20 distinct; top "W-rep-3"×479, "E-rep-3"×465, "E-rep-2"×464, "S-rep-4"×463
+  product (text): "Enterprise"×2272, "Team"×2267, "Pro"×2249, "Starter"×2212
+  units (int): min 1, max 40, mean 20.596, median 21, sum 185,364
+  unit_price (float): 49.0×2297, 19.99×2285, 129.5×2221, 349.0×2197; min 19.99, max 349, mean 134.73, median 49, sum 1,212,602.65
+  revenue (float): min 19.99, max 987,654.32, mean 2,888.30, median 1,323, sum 25,994,741.67
+    ! max 987,654.32 at L6063 is 70.7× the next largest (13,960)
+```
 
-| You say | What happens |
+### 4. Find a fact in a long document
+
+The test manual is built with the optional libraries (see [Running tests](#running-tests)):
+
+```bash
+.venv/bin/python tests/ithildin_fixtures.py /tmp/ithildin-demo
+python3 skills/ithildin/scripts/ithildin.py map  /tmp/ithildin-demo/manual.md
+python3 skills/ithildin/scripts/ithildin.py find /tmp/ithildin-demo/manual.md "coolant outlet temperature" "OF-7731-B"
+python3 skills/ithildin/scripts/ithildin.py read /tmp/ithildin-demo/manual.md 7.3
+```
+
+`map` starts with a header and the outline (about 2,300 tokens for a 109,000-token manual):
+
+```
+[ithildin map: manual.md (Markdown, 64,925 words, ~108,858 tokens). 58 sections, 52 tables, 0 figures. Outline from Markdown headings. ...]
+S1 ACME X-200 Maintenance Manual | L1-1390 | 64,925w
+  1 General Information | L2-123 | 5,853w | Record the filter housing for wear and scoring; the nominal value is 558 kPa.
+    1.1 Scope | L4-33 | 1,418w | Measure the pump assembly after the first 50 hours; the nominal value is 889 mm.
+```
+
+`find` gives each phrasing its own count and shows where each hit is (long lines are clipped):
+
+```
+[ithildin find: 'coolant outlet temperature': 1 hits in 1 sections (7.3); 'OF-7731-B': 1 hits in 1 sections (S58)]
+== 'coolant outlet temperature' (1 hits)
+>L769 §7.3 | Clean the coolant loop and log the reading in the maintenance record. ...
+== 'OF-7731-B' (1 hits)
+>L1383 §S58 | | Oil filter | OF-7731-B | 1 |
+```
+
+`read` returns just that section, starting `[ithildin read: 7.3 Operating Limits, L750-779]`. For a PDF, locations are pages (`p65-67`) instead of lines.
+
+## Configuration
+
+Everything works with no configuration. These settings change the defaults.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `LEMBAS_SQUEEZE_DIR` | `$TMPDIR/lembas-squeeze` | Where `squeeze.py` saves piped originals. The default folder is readable by you only |
+| `LEMBAS_SQUEEZE` | `1` | Set to `0` to switch the hook off |
+| `LEMBAS_SQUEEZE_BUDGET` | `1500` | Target size of the hook's summaries, in tokens |
+| `LEMBAS_SQUEEZE_THRESHOLD` | `2000` | Results under this many tokens pass through the hook unchanged |
+| `LEMBAS_RAW=1` | not set | Put it in front of a command (`LEMBAS_RAW=1 npm test`) and the hook leaves that command's output alone |
+| `ITHILDIN_CACHE` | `$TMPDIR/ithildin` | Where Ithildin caches parsed documents. The default folder is readable by you only |
+| `ITHILDIN_MAP_BUDGET` | `2500` | Target size of a map, in tokens |
+| `LEMBAS_EVAL_MODEL` | `claude-opus-5-5` | Model used by the benchmark runners in `evals/` |
+
+Command-line options:
+
+| Command | Options |
 |---|---|
-| `/lembas` or "lembas mode" | Lembas turns on and stays on for the session |
-| "be brief", "be concise", "save tokens", "cut the fluff" | Lembas usually triggers on these too |
-| "stop lembas" or "normal mode" | Lembas turns off |
+| `squeeze.py [FILE]` (reads standard input without a file) | `--type auto\|log\|json\|jsonl\|csv\|text`, `--budget 1500`, `--threshold 2000`, `--stats` |
+| `ithildin.py map FILE` | `--budget 2500`, `--depth N` (outline levels, counted from the document's top level) |
+| `ithildin.py find FILE TERM...` | `--regex`, `-n 20` (hits shown per term), `-C 0` (lines of context) |
+| `ithildin.py read FILE TARGET...` | targets are section ids (`7.3`), pages (`p71-73`) or lines (`L120-180`); `--max-tokens 8000` |
+| `ithildin.py table FILE ID` | a table id from the map (`T12`) |
 
-The compressor works on its own, with or without the skill:
+Ithildin reads PDF, DOCX, PPTX, Markdown, HTML and text with no extra software. It reads PDFs better with poppler's `pdftotext` (`brew install poppler`, `apt install poppler-utils`) or `pip install pypdf`, finds PDF table grids with `pdfplumber`, and reads `.rst`, `.odt`, `.epub` and similar through `pandoc` when it is installed.
 
-```bash
-python3 skills/lembas/scripts/squeeze.py app.log
-npm test 2>&1 | python3 skills/lembas/scripts/squeeze.py
-```
+## How it works
 
-## What it does
+The two `SKILL.md` files are instructions Claude loads when a skill is active: Lembas sets the answer shape, word budgets and how to read large outputs, and Ithildin sets the map, find, read workflow. The scripts do the work on files. `squeeze.py` detects the input type, summarises it within a token budget, keeps every distinct error, saves the original and prints its path, and passes the input through unchanged when a summary would not save at least 30%. `ithildin.py` turns a document into lines with page numbers, finds its outline from the best source available (bookmarks, heading styles, type sizes or numbering), and caches the result so repeat calls take about a millisecond. [docs/HOW_LEMBAS_WORKS.md](docs/HOW_LEMBAS_WORKS.md) walks through both, step by step.
 
-- **Names the cause, not the symptom.** If the cause is uncertain, it gives the likeliest one and the check that confirms it.
-- **Gives the exact fix and how to confirm it worked.** Code, commands, paths and numbers are never shortened.
-- **Weighs alternatives.** Each one says when it beats the recommended fix. Alternatives without a condition are dropped.
-- **Says why the fix wins.** The deciding trade-off, in a sentence or two, plus the trap people most often hit.
-- **Cuts ceremony.** No greetings, praise, restated questions, recaps or offers of help.
-- **Sets budgets.** 50 words for a quick fact, 130 for a concept, 200 for a problem or choice. Code doesn't count.
-- **Reads less.** It sizes files first, queries them narrowly, batches related queries, and squeezes output it can't narrow.
+## Running tests
 
-## When it doesn't cut
-
-Lembas relaxes for safety warnings, irreversible actions, multi-step procedures where a missing step causes failure, a confused user, and anything saved outside the chat (code, commits, docs, emails sent as you). Those answers stay complete. They still skip padding.
-
-## Ithildin: long documents
-
-Ithildin answers questions about long PDFs, Word files, decks and books without reading them whole. It maps the document (outline, page ranges, tables, defined terms), searches for the facts, and reads only the sections that answer the question, citing a page for each fact.
+The skills need only the standard library. The tests use a few more packages to build PDF, Word and PowerPoint test documents:
 
 ```bash
-python3 skills/ithildin/scripts/ithildin.py map   handbook.pdf
-python3 skills/ithildin/scripts/ithildin.py find  handbook.pdf "parental leave" "family leave"
-python3 skills/ithildin/scripts/ithildin.py read  handbook.pdf 6.2
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m unittest discover -s tests
 ```
 
-| | Whole document | Map |
-|---|---:|---:|
-| 126-page manual (PDF) | 88,533 tokens | 2,247 tokens |
-| 395-page book (PDF, no bookmarks) | 249,857 tokens | 1,699 tokens |
+Expected: `Ran 476 tests` and `OK (expected failures=1)`. The one expected failure is a known open bug, [I-43](docs/CODE_REVIEW.md#i-43). Without the extra packages, `python3 -m unittest discover -s tests` still runs and skips the tests that need them.
 
-In Claude Code on six questions about those two documents, Ithildin cut input by 26% and turns by a third, with every answer correct in both arms. Details, formats and limits are in [docs/ITHILDIN.md](docs/ITHILDIN.md).
+Coverage and lint:
 
-## Repository layout
+```bash
+.venv/bin/coverage run -m unittest discover -s tests && .venv/bin/coverage combine && .venv/bin/coverage report
+.venv/bin/ruff check .
+```
+
+To check the recorded benchmark replies and build the packages, as CI does:
+
+```bash
+python3 scripts/count_tokens.py evals/results/v2.0.0
+python3 scripts/grade.py evals/evals.json evals/results/v2.0.0
+bash scripts/package.sh
+```
+
+## Project structure
 
 ```
-skills/lembas/SKILL.md                 The skill
+skills/lembas/SKILL.md                 The Lembas skill
 skills/lembas/scripts/squeeze.py       Compressor for logs, JSON and CSV
 skills/lembas/hooks/squeeze_hook.py    Optional Claude Code hook
 skills/ithildin/SKILL.md               Ithildin, the long-document skill
 skills/ithildin/scripts/ithildin.py    Document mapper: map, find, read, table
-tests/                                 Tests and fixture generators for both skills
+tests/                                 Test suite, golden outputs and test-file generators
 evals/evals.json                       11 prompts and the facts each reply must keep
-evals/results/v2.0.0/                  Replies with and without Lembas
+evals/results/                         Replies with and without Lembas, per version
 evals/caveman-bench/                   Results on caveman's skill benchmark
 evals/squeeze-bench/                   End-to-end input-token benchmark
 evals/ithildin-bench/                  End-to-end long-document benchmark and results
 scripts/                               Token counter, grader, packager
-docs/                                  Benchmarks, design notes, compressor and Ithildin guides
+docs/                                  How it works, benchmarks, design notes, guides, code review
+brand/                                 Logo and artwork, generated by brand/_build
 ```
 
 ## Contributing
 
-Found a reply that left out something important? [Open an issue](https://github.com/jmjohns9/lembas/issues/new/choose) with the prompt and the reply. Rule changes need benchmark numbers; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to run them. Safety problems go through [SECURITY.md](SECURITY.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+Found a reply that left out something important? [Open an issue](https://github.com/jmjohns9/lembas/issues/new/choose) with the prompt and the reply. Changes to the skill need benchmark numbers; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to run them. Code changes need the tests above to pass. Safety problems go through [SECURITY.md](SECURITY.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Credits
 
