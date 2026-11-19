@@ -670,10 +670,46 @@ class I37_FileNamesCannotBeMistakenForOptions(unittest.TestCase):
 
 
 class I43_NumberedHeadingsThatOpenEveryPage(unittest.TestCase):
-    """Known limitation, not fixed: see docs/CODE_REVIEW.md, finding I-43."""
+    def doc(self, pages, chapter_pages, header=None, footer=None):
+        """`pages` pages; a numbered chapter heading opens each page in `chapter_pages`."""
+        doc = ithildin.Doc("x.pdf", "PDF")
+        doc.pages = pages
+        chapter = 0
+        for page in range(1, pages + 1):
+            if header:
+                doc.add(header(page, chapter + (page in chapter_pages)), page)
+            if page in chapter_pages:
+                chapter += 1
+                doc.add(f"{chapter} Chapter {chapter}", page)
+            for line in [f"Body text about item {page * 7}.", "More text here.", "And a last body line."]:
+                doc.add(line, page)
+            if footer:
+                doc.add(footer(page), page)
+        ithildin._strip_running_lines(doc)
+        return [t for _, t in doc.lines]
+
+    def test_chapters_two_pages_long_keep_their_headings(self):
+        lines = self.doc(12, {1, 3, 5, 7, 9, 11})
+        self.assertEqual(sum(" Chapter " in t for t in lines), 6)
+
+    def test_chapters_of_varying_length_keep_their_headings(self):
+        lines = self.doc(14, {1, 2, 4, 5, 8, 9, 11, 13})
+        self.assertEqual(sum(" Chapter " in t for t in lines), 8)
+
+    def test_page_numbers_and_running_titles_are_still_removed(self):
+        lines = self.doc(12, {1, 3, 5, 7, 9, 11}, header=lambda p, c: f"Chapter {c} · Page {p + 2}",
+                         footer=lambda p: f"{p + 10} Maintenance Manual")
+        self.assertFalse([t for t in lines if "Page" in t or "Manual" in t])
+        self.assertEqual(sum(" Chapter " in t and "·" not in t for t in lines), 6)
+
+    def test_page_numbers_that_restart_after_front_matter_are_still_removed(self):
+        lines = self.doc(12, {4, 8}, footer=lambda p: f"Page {p if p <= 3 else p - 3}")
+        self.assertFalse([t for t in lines if t.startswith("Page")])
 
     @unittest.expectedFailure
-    def test_chapter_headings_at_the_top_of_each_page_survive_header_removal(self):
+    def test_one_chapter_per_page_numbered_like_the_pages(self):
+        # Chapter n on page n reads exactly like a header that carries the page number. Nothing in
+        # the text tells the two apart, so this case is still removed.
         doc = ithildin.Doc("x.pdf", "PDF")
         doc.pages = 6
         topics = ["pumps", "valves", "filters", "belts", "gauges", "seals"]

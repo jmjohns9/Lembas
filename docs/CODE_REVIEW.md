@@ -61,9 +61,9 @@ Every finding was fixed in its own commit, whose message names the finding (`git
 
 | Status | Findings |
 |---|---|
-| Fixed | I-1 to I-5, I-7 to I-42, I-44, I-45; O-1 to O-6, O-9; T-1 to T-8 |
+| Fixed | I-1 to I-5, I-7 to I-45; O-1 to O-6, O-9; T-1 to T-8 |
 | Fixed in the README rewrite | I-6 (the install links). Publishing a GitHub release, which the old links pointed to, is left to the maintainer |
-| Open | [I-43](#i-43): removing running headers can also delete numbered chapter headings. Kept as a known failure (`expectedFailure`) in `tests/test_regressions.py`: fixing it needs a better header detector, not a patch |
+| Partly open | [I-43](#i-43) is fixed after this branch, except when every chapter is exactly one page long and numbered like the pages. That case is kept as a known failure (`expectedFailure`) in `tests/test_regressions.py` |
 | Not done | O-7 (log severity regexes) and O-8 (CLI memory on huge inputs): both low, and the measurements did not show a problem worth the change. The eval runners under `evals/` still leave files unclosed (`ResourceWarning` under `-W error`), like T-6 did for the tests |
 
 | Measure | Before | After |
@@ -350,7 +350,7 @@ Intentionally left uncovered:
 | ID | Severity | Where | Problem | Fix |
 |---|---|---|---|---|
 | <a id="i-42"></a>I-42 | Low | `squeeze.py:181` | Python warning class names are not counted as warnings: `UserWarning: …` has severity 0, while `TypeError: …` counts as an error by its suffix. | Add the `…Warning` suffix to the warning pattern. |
-| <a id="i-43"></a>I-43 | Medium | `ithildin.py:192-220` | Running-header removal ignores digits so that "Page 12" matches "Page 13". A numbered heading that opens most pages ("1 Chapter 1", "2 Chapter 2", one chapter per page) looks like the same header and is deleted, so a PDF without bookmarks loses those sections. | **Not fixed in this branch.** A footer such as "12 Maintenance Manual" has the same shape as a heading, so any rule change needs checking against real books. Recorded as an expected-failure test. |
+| <a id="i-43"></a>I-43 | Medium | `ithildin.py:192-220` | Running-header removal ignores digits so that "Page 12" matches "Page 13". A numbered heading that opens most pages ("1 Chapter 1", "2 Chapter 2", one chapter per page) looks like the same header and is deleted, so a PDF without bookmarks loses those sections. | **Fixed after this branch.** A recurring line is now kept when its numbers never repeat and do not follow the page number: a header's numbers do one or the other ("Chapter 3" over several pages, "Page 12", "12 Maintenance Manual"). Checked on the test manual and on two real books with running headers (Think Python 2, Pro Git): the lines removed are identical before and after. Still removed: one chapter per page numbered like the pages, which reads exactly like a page-numbered header (an expected-failure test). |
 | <a id="i-44"></a>I-44 | Medium | `ithildin.py:641-647` | The cache key is the file's bytes plus the script's code, not the file type. Two files with the same bytes and different extensions (`notes.md`, `notes.txt`) share an entry, so the second is given the first one's parse. | Include the lower-cased extension in the key. |
 | <a id="i-45"></a>I-45 | Low | `ithildin.py:958-961` | Without pdfplumber, `table` returns "text after the caption" but stops at the end of the caption's page. When the caption is the last line on its page, only the caption comes back. | Return the following lines regardless of the page break. |
 

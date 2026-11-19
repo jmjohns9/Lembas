@@ -222,6 +222,25 @@ def _pdf_font_headings(doc, max_pages=2000, reader=None):
         doc.headings = []
 
 
+def _numbered_headings(hits):
+    """True when a line that recurs at page edges is a run of numbered headings, not a header or footer.
+
+    `hits` is [(page, numbers in the line)]. A header's numbers either repeat ("Chapter 3" over the
+    chapter's pages) or follow the page ("Page 12", "12 Maintenance Manual"). Headings such as
+    "4 Chapter 4" never repeat, and their numbers follow the page only when every chapter is one page
+    long, which cannot be told apart from a page number."""
+    numbers = [n for _, n in hits]
+    if not numbers[0] or len(set(numbers)) < len(numbers) or len({len(n) for n in numbers}) > 1:
+        return False
+    for pos in range(len(numbers[0])):
+        offsets = {}
+        for p, n in hits:
+            offsets[n[pos] - p] = offsets.get(n[pos] - p, 0) + 1
+        if max(offsets.values()) * 2 >= len(hits):   # follows the page, allowing a restart after front matter
+            return False
+    return True
+
+
 def _strip_running_lines(doc):
     """Drop page headers and footers: lines that recur at the top or bottom of many pages."""
     if not doc.pages or doc.pages < 4:
@@ -229,16 +248,17 @@ def _strip_running_lines(doc):
     by_page = {}
     for idx, (p, t) in enumerate(doc.lines):
         by_page.setdefault(p, []).append(idx)
-    counts = {}
+    seen_on = {}   # line shape, digits as '#' -> [(page, the numbers in the line)]
     for p, idxs in by_page.items():
-        edge = idxs[:3] + idxs[-3:]
         seen = set()
-        for i in edge:
-            key = re.sub(r"\d+", "#", doc.lines[i][1].lower())
+        for i in idxs[:3] + idxs[-3:]:
+            text = doc.lines[i][1].lower()
+            key = re.sub(r"\d+", "#", text)
             if key not in seen:
                 seen.add(key)
-                counts[key] = counts.get(key, 0) + 1
-    running = {k for k, c in counts.items() if c >= max(3, 0.4 * doc.pages)}
+                seen_on.setdefault(key, []).append((p, tuple(int(n) for n in re.findall(r"\d+", text))))
+    running = {k for k, hits in seen_on.items()
+               if len(hits) >= max(3, 0.4 * doc.pages) and not _numbered_headings(hits)}
     if not running:
         return
     keep = []
