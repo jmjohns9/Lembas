@@ -1,0 +1,6 @@
+# The versions the committed PNGs were rendered with. Newer resvg-py, Pillow, uharfbuzz and fonttools
+# releases antialias edges and text slightly differently, so every PNG would change on a rebuild.
+fonttools==4.60.2
+pillow==11.3.0
+resvg_py==0.3.2
+uharfbuzz==0.51.7

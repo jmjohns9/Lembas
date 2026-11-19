@@ -71,6 +71,11 @@ def grade(ev, text):
                                              "pass_rate": round(passed / len(exp), 3)}}
 
 
+def write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(obj, fh, indent=2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -79,7 +84,8 @@ def main():
     ap.add_argument("--evals", default=os.path.join(HERE, "evals.json"))
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
-    data = json.load(open(a.evals))
+    with open(a.evals, encoding="utf-8") as fh:
+        data = json.load(fh)
     evals = data["evals"] if isinstance(data, dict) else data
     arms = {"with_skill": body(a.skill), "without_skill": None}
     if a.old_skill:
@@ -91,18 +97,18 @@ def main():
         name = ev.get("name") or ev.get("eval_name") or f"eval-{ev['id']}"
         d = os.path.join(a.out, name)
         os.makedirs(os.path.join(d, arm, "outputs"), exist_ok=True)
-        json.dump({"eval_id": ev["id"], "eval_name": name, "prompt": ev["prompt"],
-                   "assertions": ev.get("must_contain", [])}, open(os.path.join(d, "eval_metadata.json"), "w"), indent=2)
+        write_json(os.path.join(d, "eval_metadata.json"), {"eval_id": ev["id"], "eval_name": name, "prompt": ev["prompt"],
+                                                           "assertions": ev.get("must_contain", [])})
         try:
             text, out_tokens, secs = call(ev["prompt"], arms[arm])
         except Exception as exc:  # a timeout or a reply that is not JSON must not stop the other jobs
             return name, arm, f"error: {type(exc).__name__}"
         with open(os.path.join(d, arm, "outputs", "response.md"), "w", encoding="utf-8") as f:
             f.write(text)
-        json.dump({"total_tokens": out_tokens, "duration_ms": int(secs * 1000), "total_duration_seconds": round(secs, 1)},
-                  open(os.path.join(d, arm, "timing.json"), "w"), indent=2)
+        write_json(os.path.join(d, arm, "timing.json"),
+                   {"total_tokens": out_tokens, "duration_ms": int(secs * 1000), "total_duration_seconds": round(secs, 1)})
         g = grade(ev, text)
-        json.dump(g, open(os.path.join(d, arm, "grading.json"), "w"), indent=2)
+        write_json(os.path.join(d, arm, "grading.json"), g)
         return name, arm, f"{out_tokens:6} out tokens  pass {g['summary']['pass_rate']:.0%}"
 
     with ThreadPoolExecutor(a.workers) as ex:

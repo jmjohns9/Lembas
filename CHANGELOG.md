@@ -2,6 +2,12 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
+## [Unreleased]
+
+### Fixed
+- **Eval runners:** `generate_replies.py`, both `run_e2e.py` benchmarks and `live_usage.py` close every file they open, so runs no longer print `ResourceWarning`s.
+- **Brand build:** `brand/_build/requirements.txt` pins the libraries the committed PNGs were rendered with, so a rebuild reproduces every file byte for byte. Newer releases changed every PNG slightly.
+
 ## [2.2.1] - 2026-11-18
 
 ### Fixed

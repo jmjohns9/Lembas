@@ -64,7 +64,7 @@ Every finding was fixed in its own commit, whose message names the finding (`git
 | Fixed | I-1 to I-5, I-7 to I-45; O-1 to O-6, O-9; T-1 to T-8 |
 | Fixed in the README rewrite | I-6 (the install links). Publishing a GitHub release, which the old links pointed to, is left to the maintainer |
 | Partly open | [I-43](#i-43) is fixed after this branch, except when every chapter is exactly one page long and numbered like the pages. That case is kept as a known failure (`expectedFailure`) in `tests/test_regressions.py` |
-| Not done | O-7 (log severity regexes) and O-8 (CLI memory on huge inputs): both low, and the measurements did not show a problem worth the change. The eval runners under `evals/` still leave files unclosed (`ResourceWarning` under `-W error`), like T-6 did for the tests |
+| Not done | O-7 (log severity regexes) and O-8 (CLI memory on huge inputs): both low, and the measurements did not show a problem worth the change. The eval runners' unclosed files (`ResourceWarning` under `-W error`) were fixed after this branch, with a test |
 
 | Measure | Before | After |
 |---|---|---|
@@ -368,5 +368,5 @@ Things that looked wrong on reading and turned out fine when run. Recorded so th
 | `finish()` is quadratic in the number of headings (`ithildin.py:574-580`) | 110 ms for 4,200 headings. Not a practical problem. |
 | Hashing the whole document on every call is slow (`ithildin.py:641-646`) | A warm call on a 7 MB file takes 37 ms in total. |
 | `_gist` cuts sentences at abbreviations such as "Fig." | "See Fig. 3 for the layout." is kept whole, because the next character is not a capital. Did not reproduce. |
-| Brand assets might be out of sync with their build scripts | All 46 SVG, HTML and Markdown outputs regenerate byte-for-byte. The 60 PNG and ICO files differ at byte level under newer renderer versions; they were not compared visually. |
+| Brand assets might be out of sync with their build scripts | All 46 SVG, HTML and Markdown outputs regenerate byte-for-byte. The 60 PNG files also regenerate byte-for-byte with the library versions they were made with, now pinned in `brand/_build/requirements.txt`. The latest releases (resvg-py 0.5.0, Pillow 13.0.0, uharfbuzz 0.57.0, fonttools 4.68.0) change up to 0.78% of an image's pixels, along edges and text. |
 | "Python 3.8+" might be untrue | `tests/test_squeeze.py` passes on 3.8.20, and `ithildin.py map` runs on it. |

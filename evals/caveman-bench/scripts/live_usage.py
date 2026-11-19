@@ -20,4 +20,4 @@ with ThreadPoolExecutor(12) as ex:
     rows=list(ex.map(go,[(a,i) for a in arms for i in prompt_idx]))
 print(f"{'arm':10} {'prompt':>6} {'billed out':>10} {'tokenizer':>9} {'chars':>6}")
 for a,i,o,t,c in rows: print(f"{a:10} {i:6} {o:10} {t:9} {c:6}")
-json.dump(rows,open(sys.argv[4],"w"))
+Path(sys.argv[4]).write_text(json.dumps(rows),encoding="utf-8")
