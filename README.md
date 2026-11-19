@@ -5,6 +5,7 @@
 </picture>
 
 [![Checks](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml/badge.svg)](https://github.com/jmjohns9/lembas/actions/workflows/checks.yml)
+[![Release](https://img.shields.io/github/v/release/jmjohns9/lembas?style=flat-square&labelColor=0E1719&color=3E5C47)](https://github.com/jmjohns9/lembas/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3E5C47?style=flat-square&labelColor=0E1719)](LICENSE)
 
 # Lembas
@@ -20,6 +21,18 @@ Most of a typical AI reply isn't the answer. It's setup, a restated question, he
 Lembas also cuts what Claude **reads**. It queries large files before reading them, and it ships `squeeze.py`, which turns a 24,000-line log into a summary of about 1,300 tokens that keeps every distinct error. The repository holds a second skill, **Ithildin**, for long documents: it maps a 400-page book in about 2,000 tokens, then reads only the sections a question needs.
 
 New to tokens and context windows? [docs/HOW_LEMBAS_WORKS.md](docs/HOW_LEMBAS_WORKS.md) explains them and walks through the code.
+
+## What's new
+
+**[2.2.2](https://github.com/jmjohns9/lembas/releases/tag/v2.2.2)** (latest), **[2.2.1](https://github.com/jmjohns9/lembas/releases/tag/v2.2.1)** and **[2.2.0](https://github.com/jmjohns9/lembas/releases/tag/v2.2.0)** come from a full review of the code ([docs/CODE_REVIEW.md](docs/CODE_REVIEW.md)):
+
+- **Faster.** `find` with 12,000 hits went from 2,555 ms to 371 ms, squeezing 100,000 JSON objects from 1,005 ms to 673 ms, and the hook on a small result, which runs on every tool call, from 28.8 ms to 19.9 ms. Output is byte-identical.
+- **Fixes.** Piped output is no longer lost when the cache folder can't be written or the terminal isn't UTF-8. The hook no longer summarises a partial Read as if it were the whole file. Slide numbers in reordered decks are right, and Word text inside content controls is read. Cache files are private to the current user.
+- **Ithildin keeps chapter headings** that open many pages of a PDF without bookmarks, instead of removing them as running headers (2.2.1).
+- **Tested.** 43 tests became 490, with 98% line coverage, run by CI on Python 3.10, 3.12 and 3.13.
+- **Downloads.** Each release has `lembas.skill` and `ithildin.skill` attached for the Claude apps.
+
+Every change is in the [CHANGELOG](CHANGELOG.md); every version is on the [releases page](https://github.com/jmjohns9/lembas/releases).
 
 ## Key features
 
