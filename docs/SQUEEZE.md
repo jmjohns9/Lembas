@@ -17,7 +17,7 @@ Every summary starts with one line that says it is a summary, gives the original
 ## Guarantees
 
 - **Errors are never dropped silently.** Every distinct error message is shown with its trace, or the summary says how many more exist and how to list them.
-- **The original is never changed.** Piped input is saved to `$LEMBAS_SQUEEZE_DIR` (default `$TMPDIR/lembas-squeeze`). The folder is readable by you only, because command output can contain secrets.
+- **The original is never changed.** Piped input is saved to `$LEMBAS_SQUEEZE_DIR` (default `$TMPDIR/lembas-squeeze`). The folder is readable by you only, because command output can contain secrets, and each copy is deleted after `$LEMBAS_SQUEEZE_KEEP_HOURS` hours (default 24; `0` saves nothing).
 - **Code, diffs and prose pass through unchanged** unless you force a type. Squeezing code would break edits.
 - **Small inputs pass through unchanged.** The default threshold is about 2,000 tokens.
 - **If squeezing fails or saves less than 30%, the input is printed unchanged.** A parser bug can never hide output.

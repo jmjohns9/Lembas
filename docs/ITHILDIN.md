@@ -59,7 +59,7 @@ Running headers and footers are removed first (lines that recur at the top or bo
 
 `.doc` and `.ppt` need converting first; Ithildin prints the LibreOffice command. Scanned PDFs have no text layer; the map says so and suggests OCR (`ocrmypdf`).
 
-Parsed documents are cached in `$ITHILDIN_CACHE` (default `$TMPDIR/ithildin`, readable by you only), keyed on the file's contents and the script's own code, so a changed file or a new version never reuses a stale entry. Nothing leaves your machine.
+Parsed documents are cached in `$ITHILDIN_CACHE` (default `$TMPDIR/ithildin`, readable by you only), keyed on the file's contents and the script's own code, so a changed file or a new version never reuses a stale entry. Entries are deleted after `$ITHILDIN_CACHE_HOURS` hours (default 24; `0` turns the cache off). Nothing leaves your machine.
 
 ## Results in Claude Code
 

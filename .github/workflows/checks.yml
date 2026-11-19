@@ -51,6 +51,7 @@ jobs:
           bash scripts/package.sh
           unzip -l dist/lembas.skill | grep -q 'lembas/SKILL.md'
           unzip -l dist/ithildin.skill | grep -q 'ithildin/scripts/ithildin.py'
+          (cd dist && sha256sum -c SHA256SUMS)
 
   # The skills need only the standard library. Run the suite with nothing installed, on the oldest
   # available Python and a recent one, so a newer-only feature or a hidden dependency shows up here.

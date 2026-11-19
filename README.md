@@ -71,7 +71,7 @@ cp -r lembas/skills/ithildin ~/.claude/skills/    # optional: long documents
 
 Start a session and type `/lembas` or "lembas mode". It stays on until you say "stop lembas" or "normal mode". Ithildin triggers on its own when you ask about a long document, or with `/ithildin`.
 
-**Claude apps (claude.ai, desktop):** download `lembas.skill` and `ithildin.skill` from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), then open each in Claude and click **Save skill**. To build them yourself instead:
+**Claude apps (claude.ai, desktop):** download `lembas.skill` and `ithildin.skill` from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), then open each in Claude and click **Save skill**. Each release also has a `SHA256SUMS` file: `sha256sum -c SHA256SUMS` (or `shasum -a 256 -c SHA256SUMS` on macOS) in the download folder checks the files. To build them yourself instead:
 
 ```bash
 git clone https://github.com/jmjohns9/lembas.git
@@ -201,11 +201,13 @@ Everything works with no configuration. These settings change the defaults.
 | Setting | Default | What it does |
 |---|---|---|
 | `LEMBAS_SQUEEZE_DIR` | `$TMPDIR/lembas-squeeze` | Where `squeeze.py` saves piped originals. The default folder is readable by you only |
+| `LEMBAS_SQUEEZE_KEEP_HOURS` | `24` | Saved originals are deleted after this many hours. `0` saves nothing; summaries then say the original was not kept |
 | `LEMBAS_SQUEEZE` | `1` | Set to `0` to switch the hook off |
 | `LEMBAS_SQUEEZE_BUDGET` | `1500` | Target size of the hook's summaries, in tokens |
 | `LEMBAS_SQUEEZE_THRESHOLD` | `2000` | Results under this many tokens pass through the hook unchanged |
 | `LEMBAS_RAW=1` | not set | Put it in front of a command (`LEMBAS_RAW=1 npm test`) and the hook leaves that command's output alone |
 | `ITHILDIN_CACHE` | `$TMPDIR/ithildin` | Where Ithildin caches parsed documents. The default folder is readable by you only |
+| `ITHILDIN_CACHE_HOURS` | `24` | Cached documents are deleted after this many hours. `0` turns the cache off |
 | `ITHILDIN_MAP_BUDGET` | `2500` | Target size of a map, in tokens |
 | `LEMBAS_EVAL_MODEL` | `claude-opus-5-5` | Model used by the benchmark runners in `evals/` |
 
@@ -235,7 +237,7 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests
 ```
 
-Expected: `Ran 490 tests` and `OK (expected failures=1)`. The one expected failure is the case [I-43](docs/CODE_REVIEW.md#i-43) leaves open: one chapter per page, numbered like the pages. Without the extra packages, `python3 -m unittest discover -s tests` still runs and skips the tests that need them.
+Expected: `Ran 503 tests` and `OK (expected failures=1)`. The one expected failure is the case [I-43](docs/CODE_REVIEW.md#i-43) leaves open: one chapter per page, numbered like the pages. Without the extra packages, `python3 -m unittest discover -s tests` still runs and skips the tests that need them.
 
 Coverage and lint:
 
