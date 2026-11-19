@@ -873,6 +873,46 @@ class I38_BenchmarkRunnersSurviveAFailedRun(unittest.TestCase):
         self.assertFalse(os.path.exists(folders[0]))
 
 
+class R_BenchmarkRunnersCloseTheirFiles(unittest.TestCase):
+    """Each runner opened files without closing them, so a run printed ResourceWarnings."""
+
+    def assert_no_unclosed_files(self, fn):
+        import gc
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", ResourceWarning)
+            fn()
+            gc.collect()
+        self.assertFalse([str(w.message) for w in caught if issubclass(w.category, ResourceWarning)])
+
+    def test_generate_replies(self):
+        evals = support.write(support.tmp("regressions", "r-close-gen", "evals.json"), json.dumps({"evals": [
+            {"id": 1, "name": "one", "category": "code", "prompt": "q", "must_contain": []}]}))
+        skill = support.write(support.tmp("regressions", "r-close-gen", "SKILL.md"), "Rules.")
+        out_dir = support.tmp("regressions", "r-close-gen", "out", "x")[:-2]
+        with mock.patch.object(gen, "call", return_value=("x = 1", 5, 0.1)):
+            self.assert_no_unclosed_files(
+                lambda: run_script(gen, out_dir, "--skill", skill, "--evals", evals, "--workers", "1"))
+
+    def test_benchmarks(self):
+        ith_bench = support.load_script("ithildin_bench_regressions",
+                                        os.path.join(support.ROOT, "evals", "ithildin-bench", "run_e2e.py"))
+        for name, bench, task_file in [("sq", sq_bench, "app.log"), ("ith", ith_bench, "manual.pdf")]:
+            with self.subTest(name):
+                folder = support.tmp("regressions", "r-close-" + name, "x")[:-2]
+                support.write(os.path.join(folder, task_file), "data")
+                out = os.path.join(folder, "results.json")
+                task = {"id": "t", "file": task_file, "prompt": "Q?", "check": bool}
+                with mock.patch.object(bench.subprocess, "run", side_effect=subprocess.TimeoutExpired("claude", 1)):
+                    self.assert_no_unclosed_files(lambda: bench.run_one(task, "default", 0, folder))
+                self.assert_no_unclosed_files(bench.skill_prompt)
+                with mock.patch.object(bench, "run_one", return_value={"task": "t"}):
+                    self.assert_no_unclosed_files(
+                        lambda: run_script(bench, folder, out, "--reps", "1", "--arms", "default", "--workers", "1"))
+                with open(out, encoding="utf-8") as fh:
+                    self.assertTrue(json.load(fh))
+
+
 class I39_OpenerCheckUsesWholeWords(unittest.TestCase):
     def opens_with_answer(self, text):
         return {label: ok for _, label, ok in grade.checks(text, {"must_contain": []}, "baseline")}["opens with the answer"]

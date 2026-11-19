@@ -60,8 +60,14 @@ TASKS = [
 ]
 
 
+def write_json(path, obj, **kw):
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(obj, fh, **kw)
+
+
 def skill_prompt():
-    text = open(os.path.join(SKILL_DIR, "SKILL.md")).read()
+    with open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8") as fh:
+        text = fh.read()
     text = text.split("---", 2)[2] if text.startswith("---") else text
     return text.replace("scripts/ithildin.py", SCRIPT)
 
@@ -70,7 +76,7 @@ def run_one(task, arm, rep, docs):
     work = tempfile.mkdtemp(prefix=f"ithildin-e2e-{task['id']}-")
     shutil.copy(os.path.join(docs, task["file"]), work)
     os.makedirs(os.path.join(work, ".claude"))
-    json.dump({}, open(os.path.join(work, ".claude", "settings.json"), "w"))
+    write_json(os.path.join(work, ".claude", "settings.json"), {})
     args = ["claude", "-p", "--setting-sources", "project", "--strict-mcp-config", "--disable-slash-commands",
             "--model", MODEL, "--output-format", "json", "--allowedTools=Bash,Read,Grep,Glob"]
     if arm == "ithildin":
@@ -112,7 +118,7 @@ def main():
             results.append(res)
             print(json.dumps({k: res.get(k) for k in ("task", "arm", "rep", "total_input", "cost_usd", "turns",
                                                         "correct", "error")}), flush=True)
-            json.dump(results, open(a.out, "w"), indent=1)
+            write_json(a.out, results, indent=1)
     print("wrote", a.out)
 
 

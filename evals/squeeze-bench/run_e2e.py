@@ -87,8 +87,14 @@ TASKS_MID = [
 ]
 
 
+def write_json(path, obj, **kw):
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(obj, fh, **kw)
+
+
 def skill_prompt():
-    text = open(os.path.join(SKILL_DIR, "SKILL.md")).read()
+    with open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8") as fh:
+        text = fh.read()
     text = text.split("---", 2)[2] if text.startswith("---") else text
     return text.replace("scripts/squeeze.py", SQUEEZE)
 
@@ -103,7 +109,7 @@ def run_one(task, arm, rep, fixtures):
         settings = {"hooks": {
             "PreToolUse": [{"matcher": "Read", "hooks": [{"type": "command", "command": cmd}]}],
             "PostToolUse": [{"matcher": "Bash|Read", "hooks": [{"type": "command", "command": cmd}]}]}}
-    json.dump(settings, open(os.path.join(work, ".claude", "settings.json"), "w"))
+    write_json(os.path.join(work, ".claude", "settings.json"), settings)
     args = ["claude", "-p", "--setting-sources", "project", "--strict-mcp-config", "--disable-slash-commands",
             "--model", MODEL, "--output-format", "json", "--allowedTools=Bash,Read,Grep,Glob"]
     if "skill" in arm:
@@ -146,7 +152,7 @@ def main():
         for res in ex.map(lambda j: run_one(j[0], j[1], j[2], a.fixtures), jobs):
             results.append(res)
             print(json.dumps({k: res.get(k) for k in ("task", "arm", "rep", "total_input", "cost_usd", "turns", "correct", "error")}), flush=True)
-            json.dump(results, open(a.out, "w"), indent=1)
+            write_json(a.out, results, indent=1)
     print("wrote", a.out)
 
 
