@@ -1,0 +1,372 @@
+# Code review
+
+A line-by-line review of the Lembas repository at commit `04e0c85` (`main`, 2026-10-26), carried out on 2026-11-14 on branch `review/full-audit`.
+
+Every finding below was reproduced by running the code, unless it is marked **not verified**. Suspicions that did not reproduce are listed under [Checked and cleared](#checked-and-cleared) so nobody has to re-investigate them.
+
+## Summary
+
+| Area | High | Medium | Low | Total |
+|---|---:|---:|---:|---:|
+| [Optimize](#2a-optimize) | 0 | 3 | 6 | 9 |
+| [Test](#2b-test) | 1 | 4 | 3 | 8 |
+| [Improve](#2c-improve) | 6 | 15 | 24 | 45 |
+| **Total** | **7** | **22** | **33** | **62** |
+
+Four of the Improve findings (I-42 to I-45) were found after the first review, while writing the unit tests. They are listed under [Found while writing tests](#found-while-writing-tests).
+
+The seven High findings:
+
+| ID | Finding | Where |
+|---|---|---|
+| [I-1](#i-1) | Piped output is lost when the cache folder cannot be written | `squeeze.py:804` |
+| [I-2](#i-2) | Output is lost when the terminal is not UTF-8 (Windows) | `squeeze.py:837`, `ithildin.py:992-998` |
+| [I-3](#i-3) | The hook summarises a partial file read as if it were the whole file | `squeeze_hook.py:84-99` |
+| [I-4](#i-4) | Reordered PowerPoint decks get the wrong slide numbers | `ithildin.py:360-361` |
+| [I-5](#i-5) | Word text inside content controls is silently skipped | `ithildin.py:302-333` |
+| [I-6](#i-6) | The README's install links return 404 | `README.md:8,51`, `CHANGELOG.md:109-112` |
+| [T-1](#t-1) | The test suite only passes on Linux, and CI installs unpinned dependencies | `tests/ithildin_fixtures.py:167`, `tests/test_ithildin.py:109,120`, `checks.yml:42` |
+
+No secrets, API keys or credentials were found in the repository.
+
+## Baseline
+
+Recorded before any change, on macOS (Darwin 27, arm64).
+
+| Check (as run by CI) | Result |
+|---|---|
+| Skill files have `name` and `description` | pass |
+| `scripts/count_tokens.py evals/results/v2.0.0` | pass (total cut 48.6%) |
+| `scripts/grade.py evals/evals.json evals/results/v2.0.0` | pass (lembas 84/85 checks, baseline 57/65; misses are style warnings) |
+| `tests/test_squeeze.py` | pass, 23 of 23 |
+| `tests/test_ithildin.py` | **fail, 18 of 20** (see [T-1](#t-1)) |
+| `scripts/package.sh` | pass, builds both `.skill` archives |
+
+| Measure | Value |
+|---|---|
+| Tests | 43 (41 passing) |
+| Line coverage, `skills/` and `scripts/` | 82% (1,534 statements, 274 missed) |
+| `squeeze.py` | 86% |
+| `ithildin.py` | 86% |
+| `squeeze_hook.py` | not measured: it only runs in a subprocess, which the coverage tool does not follow by default |
+| `scripts/count_tokens.py`, `scripts/grade.py` | 0% |
+| Python versions on which `tests/test_squeeze.py` passes | 3.8.20, 3.9.6, 3.12.13, 3.13.9 |
+| Lint (`ruff --select F`) | 8 findings; no linter is configured in the repo |
+
+Environment: Python 3.12.13 (the version CI pins), pypdf 7.1.0, pdfplumber 0.11.10, reportlab 5.1.0, python-docx 1.2.0, python-pptx 1.0.2, poppler 26.11.0. CI passed on this same commit on 2026-10-26; the difference is explained in [T-1](#t-1).
+
+## After this branch
+
+Every finding was fixed in its own commit, whose message names the finding (`git log --grep "I-14"`). Each bug fix first added a failing test in `tests/test_regressions.py`.
+
+| Status | Findings |
+|---|---|
+| Fixed | I-1 to I-5, I-7 to I-42, I-44, I-45; O-1 to O-6, O-9; T-1 to T-8 |
+| Fixed in the README rewrite | I-6 (the install links). Publishing a GitHub release, which the old links pointed to, is left to the maintainer |
+| Open | [I-43](#i-43): removing running headers can also delete numbered chapter headings. Kept as a known failure (`expectedFailure`) in `tests/test_regressions.py`: fixing it needs a better header detector, not a patch |
+| Not done | O-7 (log severity regexes) and O-8 (CLI memory on huge inputs): both low, and the measurements did not show a problem worth the change. The eval runners under `evals/` still leave files unclosed (`ResourceWarning` under `-W error`), like T-6 did for the tests |
+
+| Measure | Before | After |
+|---|---|---|
+| Tests | 43 (41 passing on macOS) | 476 passing, plus 1 known failure (I-43) |
+| Line coverage, `skills/` and `scripts/` (hook included) | 83% of 1,638 statements | 98% of 1,893 statements |
+| `ruff check` (bugs and dead code) | 8 findings, no configuration | 0 |
+| Python versions the suite passes on | 3.12 on Linux only | 3.8, 3.9, 3.12 and 3.13 on macOS; CI runs 3.9, 3.12 and 3.13 |
+
+Speed, best of several runs on the same machine (macOS, arm64, Python 3.12). Changes under about 10% are within run-to-run noise: the bare interpreter itself measured 15.9 ms before and 13.8 ms after.
+
+| Task | Before | After | Finding |
+|---|---:|---:|---|
+| `find` with a common pattern on a 7 MB document (12,000 hits) | 2,555 ms | 371 ms | O-1 |
+| Squeeze a JSON array of 100,000 objects (12.4 MB) | 1,005 ms | 673 ms | O-2 |
+| Same, piped with no file name | 1,113 ms | 676 ms | O-2, O-5 |
+| Squeeze a 200,000-row CSV (4.7 MB) | 1,079 ms | 769 ms | O-3 |
+| Hook on a small Bash result (runs on every tool call) | 28.8 ms | 19.9 ms | O-4 |
+| Hook when switched off | 28.7 ms | 17.4 ms | O-4 |
+| Cold load of a 7 MB Markdown file | 869 ms | 510 ms | O-6 |
+| Cold load of a PDF without bookmarks | 435 ms | 384 ms | O-9 |
+| Squeeze a 1.9 MB log | 311 ms | 301 ms | none (unchanged) |
+
+Outputs are byte-identical before and after each optimization: the golden tests check the command-line output, and each change was also compared on the benchmark files and on randomly generated inputs (see the commit messages).
+
+## Project map
+
+Lembas is two Claude skills plus the tooling that measures them. A *skill* is a folder holding a `SKILL.md` file (instructions Claude loads) and optional scripts Claude can run.
+
+| Path | What it is |
+|---|---|
+| `skills/lembas/SKILL.md` | The Lembas skill: rules for short, dense answers, and for reading large outputs cheaply |
+| `skills/lembas/scripts/squeeze.py` | Compressor: turns a large log, JSON, JSONL or CSV into a short summary. 845 lines, standard library only |
+| `skills/lembas/hooks/squeeze_hook.py` | Optional Claude Code hook that applies `squeeze.py` to Bash and Read results automatically |
+| `skills/ithildin/SKILL.md` | The Ithildin skill: how to answer questions about a long document without reading it whole |
+| `skills/ithildin/scripts/ithildin.py` | Document reader with four commands: `map`, `find`, `read`, `table`. 1,002 lines |
+| `scripts/count_tokens.py`, `scripts/grade.py` | Benchmark checks run by CI: reply length, and whether replies keep required facts |
+| `scripts/package.sh` | Zips each skill folder into `dist/<name>.skill` |
+| `tests/` | `unittest` suites and fixture generators for both scripts |
+| `evals/` | Benchmark prompts, saved model replies, and runners that call the `claude` CLI |
+| `brand/` | Logo, icons and guidelines, generated by `brand/_build/*.py` |
+| `docs/` | Benchmarks, design notes, and guides for Squeeze and Ithildin |
+
+### How data flows
+
+```
+Squeeze
+  text (file, pipe, or tool result)
+    -> clean()      strip colour codes and progress-bar redraws
+    -> est_tokens() under the threshold? pass through unchanged
+    -> detect()     log | json | jsonl | csv | code | diff | text
+    -> squeeze_log / squeeze_json / squeeze_csv / squeeze_text
+                    render at up to five detail levels until the summary fits the budget
+    -> save_original()  piped input only: keep the full text in a private cache file
+    -> header line + summary, or the input unchanged if the saving is under 30%
+
+Hook
+  Claude Code tool event (JSON on stdin)
+    -> PostToolUse Bash   squeeze stdout and stderr
+    -> PostToolUse Read   squeeze .log/.json/.csv content
+    -> PreToolUse  Read   file over 256 KB: decline the read, return a summary
+    -> JSON on stdout that replaces what the model sees
+
+Ithildin
+  document path
+    -> load()       hash the file, return the cached parse if there is one
+    -> extract_*()  PDF | DOCX | PPTX | Markdown | HTML | text  ->  lines, each with a page
+    -> finish()     headings -> sections with ids, gists, tables, defined terms
+    -> cache as JSON
+    -> render_map | render_find | render_read | render_table
+```
+
+### Files read, and files skipped
+
+Read in full: all 25 Python files, both `SKILL.md` files, `package.sh`, the CI workflow, issue and PR templates, every Markdown document outside `evals/results/`, and `evals/evals.json`.
+
+Skipped, with reasons:
+
+| Skipped | Why |
+|---|---|
+| `brand/**/*.svg`, `*.png`, `*.ico`, `brand/guidelines.html` (121 files) | Generated by `brand/_build/`. Verified instead by rebuilding: all 46 text assets regenerate byte-for-byte |
+| `brand/fonts/*.ttf`, `OFL-*.txt` (11 files) | Vendored third-party fonts and their licences |
+| `evals/results/**` (55 files) | Saved model replies: benchmark data, not source |
+| `evals/caveman-bench/fidelity/*`, `snapshots/*`, `evals/ithildin-bench/results-opus-5-5.json` (17 files) | Recorded benchmark data |
+| `LICENSE` | Standard Apache 2.0 text; only the header was checked |
+| `dist/`, `.venv/` | Build output and the local environment; both are git-ignored |
+
+---
+
+## 2a. Optimize
+
+Timings are best-of-N wall time on the machine above. "Before" numbers are in this document; "after" numbers will be added once the fixes land. No speed-up is claimed until it has been measured.
+
+### Medium
+
+<a id="o-1"></a>
+**O-1. `find` scans every heading for every hit** · `ithildin.py:707-714`, called from `:884` and `:893`
+
+- **Problem.** `section_of()` walks the heading list from the start to locate the section containing a line, and `render_find` calls it for every hit, including hits beyond the `-n` display limit.
+- **Why it matters.** Cost grows with hits × headings. On a 7 MB document with 4,200 headings, a pattern with about 12,000 hits took **2,555 ms, of which 2,244 ms (88%) was `section_of`**.
+- **Fix.** Keep a sorted list of heading start lines and use `bisect` to find the section in logarithmic time. Output must be identical.
+
+<a id="o-2"></a>
+**O-2. JSON arrays are flattened twice per item** · `squeeze.py:510`, `:539` (via `_is_bad`, `:383`), `:520`, `:526`, `:534`
+
+- **Problem.** `_render_array` flattens each object once to list its fields, then `_is_bad` flattens the same object again to look for failures. Field presence is also recounted up to three times per key with `sum(k in f for f in flats)`. If the first detail level is over budget, all of it repeats at each of up to five levels.
+- **Why it matters.** An array of 100,000 objects (12.4 MB) took **1,005 ms; parsing the JSON accounts for only 104 ms**. `_flatten` ran 406,032 times.
+- **Fix.** Flatten each item once and reuse it for the failure check; count field presence once; cache per-array results that do not depend on the detail level.
+
+<a id="o-3"></a>
+**O-3. Numeric CSV cells are parsed twice, and columns are fully sorted to find two values** · `squeeze.py:602`, `:613`, `:626`, `:581-584`
+
+- **Problem.** `_profile_column` calls `_num_value` on every cell to decide the column is numeric, then calls it again on every cell to get the values. It then sorts the whole column to read the two largest and two smallest. `_num_value` also re-runs a regex through `re.match` with a string pattern on each call.
+- **Why it matters.** A 200,000-row CSV took **1,079 ms; `_num_value` ran 1.2 million times for 622 ms** of its own time, and the sort added 165 ms.
+- **Fix.** Parse each cell once and keep the result; precompile the pattern; use `heapq.nlargest`/`nsmallest` for the outlier check.
+
+### Low
+
+| ID | Where | Problem | Measured | Fix |
+|---|---|---|---|---|
+| <a id="o-4"></a>O-4 | `squeeze_hook.py:28`, `:138`; imports at `squeeze.py:24-34` | The hook imports `squeeze` (and with it `argparse`, `statistics`, `tempfile`, `hashlib`, `csv`) before it checks the `LEMBAS_SQUEEZE=0` off switch. The hook runs on every Bash and Read call. | Hook on a tiny payload: 28.8 ms against an interpreter floor of 15.9 ms. Same 28.7 ms when switched off. Imports cost 12.3 ms. | Check the off switch first; defer `argparse`, `statistics`, `tempfile` and `hashlib` to the functions that use them. |
+| <a id="o-5"></a>O-5 | `squeeze.py:136-141`, `:780` | For piped JSON, `detect()` parses the whole text to confirm it is JSON, throws the result away, and `squeeze()` parses it again. | 1,113 ms piped against 1,005 ms with a `.json` name: about 105 ms (10%) on 12.4 MB. | Parse once and pass the object through. |
+| <a id="o-6"></a>O-6 | `ithildin.py:402`, `:411`, `:414`, `:53` | `extract_markdown` calls `re.match` with string patterns on every line, so each call goes through the regex cache lookup; `norm()` does the same. | Cold load of a 7 MB Markdown file: 869 ms, with 754,800 cache lookups costing 143 ms. | Compile the patterns once at module level. |
+| <a id="o-7"></a>O-7 | `squeeze.py:175-184`, `:226-233` | Three regex searches per log line decide severity; the error pattern is a long alternation with lookarounds. | `app.log` (1.9 MB): 311 ms, of which 206 ms is regex search. Scales linearly: 19 MB took 3,133 ms. | Try a cheap keyword pre-check before the full regex. Adopt only if summaries stay byte-identical and the gain is measured. |
+| <a id="o-8"></a>O-8 | `squeeze.py:826-837` | The CLI holds the raw bytes, the decoded text and the cleaned text at once, and on a pass-through runs `clean()` a second time. Unlike the hook (64 MB cap), the CLI has no size limit. | Not measured as a problem at the sizes tested (up to 19 MB). | Reuse the cleaned text; drop the raw bytes after decoding; document the memory profile. |
+| <a id="o-9"></a>O-9 | `ithildin.py:93`, `:121`, `:229` | A PDF without bookmarks is opened with `PdfReader` up to three times (text fallback, outline, type sizes). | Cold load 435 ms for the bookmark-free manual against 134 ms with bookmarks. Paid once per document; later calls hit the cache (1.5 ms). | Open the reader once and share it. |
+
+---
+
+## 2b. Test
+
+### High
+
+<a id="t-1"></a>
+**T-1. The suite only passes on Linux, and CI installs whatever versions are newest** · `tests/ithildin_fixtures.py:167-171`, `tests/test_ithildin.py:109`, `:120-121`, `:127`, `.github/workflows/checks.yml:42`
+
+- **Problem.** The PDF fixture is built at test time. It uses the DejaVu font only if it exists at the Linux path `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`, and otherwise falls back to Helvetica without saying so. Helvetica is narrower, so the manual comes out at 115 pages instead of 126 and its lines wrap differently. Two tests hard-code layout: section 7.3 on `p71-73`, and exactly one line containing "altitude". CI also runs `pip install -q pypdf pdfplumber reportlab python-docx python-pptx` with no versions.
+- **Why it matters.** The suite fails 2 of 20 on macOS and would on Windows, so a contributor cannot tell a real regression from a font difference. With unpinned installs, CI can also go red or green without any change to the repo. Poppler was ruled out as the cause: the same two tests fail with and without `pdftotext`.
+- **Fix.** Assert on what the code is responsible for: take the expected page range from the `map` output and check that `read` agrees with it, and assert the planted fact is found in the right section rather than counting wrapped lines. Add `requirements-dev.txt` with tested versions and install from it in CI.
+
+### Medium
+
+| ID | Where | Problem | Why it matters | Fix |
+|---|---|---|---|---|
+| <a id="t-2"></a>T-2 | `scripts/count_tokens.py`, `scripts/grade.py` | No tests; 0% coverage. | Both are CI gates. `grade.py` is the check SECURITY.md relies on to catch a dropped safety step, and it has real defects ([I-12](#i-12)). | Unit tests for `checks()`, `make_counter()` and both `main()` functions. |
+| <a id="t-3"></a>T-3 | `skills/lembas/hooks/squeeze_hook.py` | Tested only through a subprocess, so coverage is invisible, and several branches are never exercised: stderr squeezing, the `isImage` guard, a missing saved-output file, `--print-settings`. | The hook rewrites what the model sees on every tool call; untested branches there are the riskiest in the repo. | In-process tests that call `on_bash`, `on_read_post`, `on_read_pre` and `main` directly, alongside the existing subprocess tests. |
+| <a id="t-4"></a>T-4 | `tests/test_squeeze.py`, `tests/test_ithildin.py` | Tests are end-to-end on generated fixtures. No public function has a direct unit test, and there are no edge cases: empty input, whitespace only, one very long line, Unicode, a byte-order mark, malformed data, boundary values. Error paths are covered by two tests in total. | Most of the bugs in section 2c live in exactly those untested paths. | A unit-test module per script covering every public function, edge cases and error paths. |
+| <a id="t-5"></a>T-5 | `evals/generate_replies.py:48-70`, `evals/*/run_e2e.py` | The graders and task checks have no tests. The runners need the `claude` CLI and a paid account. | A wrong regex in a grader silently changes published benchmark numbers. | Test `grade()`, `body()` and each task's `check` directly; test `call()` and `run_one()` with `subprocess.run` mocked, so no CLI or API key is needed. |
+
+### Low
+
+| ID | Where | Problem | Fix |
+|---|---|---|---|
+| T-6 | `tests/test_squeeze.py:20,26,90,158,178,187,214`, `tests/test_ithildin.py` | Files are opened without being closed, which raises `ResourceWarning` under `python -W error`. Temp folders made at import time are never removed. | Use `with open(...)`; clean up with `addModuleCleanup`. |
+| T-7 | `.github/workflows/checks.yml:19` | CI tests Python 3.12 only, while `squeeze.py:22` promises "Python 3.8+". The claim holds today (verified on 3.8, 3.9, 3.12, 3.13) but nothing guards it. | Add a small version matrix for the standard-library tests. |
+| T-8 | repo root | No coverage configuration and no single command that runs every test. | Add `pyproject.toml` with coverage settings (tool configuration only, no packaging), and document `python3 -m unittest discover -s tests`. |
+
+### Planned test suite
+
+Framework: `unittest`, which the project already uses. No new runtime dependency.
+
+| Module | Covers |
+|---|---|
+| `tests/test_squeeze_units.py` | Every public function in `squeeze.py`: `est_tokens`, `clean`, `clip`, `detect` (each type), `template`, severity rules, `squeeze_log`, JSON helpers, `squeeze_json`, `_num_value`, `_profile_column`, `squeeze_csv`, `squeeze_text`, `save_original`, `squeeze`, and the CLI |
+| `tests/test_squeeze_hook.py` | The hook in-process: each event, slices, narrowed commands, off switch, bad input, settings output |
+| `tests/test_ithildin_units.py` | Every public function in `ithildin.py`, using Markdown, HTML, text, and DOCX/PPTX files built with the standard library, so these run with no optional dependency |
+| `tests/test_ithildin_pdf.py` | PDF paths, including `pdftotext` present, absent, and failing, with the external command mocked |
+| `tests/test_scripts.py` | `count_tokens.py`, `grade.py`, `package.sh` |
+| `tests/test_evals.py` | Graders and task checks; runners with the `claude` CLI mocked |
+| `tests/test_integration.py` | End-to-end flows: pipe → summary → saved original → look up a cited line; map → find → read → table; hook settings → hook run |
+| `tests/test_regressions.py` | One test per bug in section 2c, written to fail before the fix |
+| `tests/test_golden.py` | Byte-identical summaries for the fixtures, recorded before any optimization, to prove section 2a changes nothing but speed |
+
+Target: 90% or more line coverage on `squeeze.py`, `squeeze_hook.py`, `ithildin.py` and `scripts/*.py`.
+
+Intentionally left uncovered:
+
+- **Real `claude -p` calls** in `evals/`. They need the CLI and spend money; the tests mock the subprocess instead.
+- **`evals/caveman-bench/scripts/`**. These import `llm_run` from a separate repository (caveman) that is not vendored here.
+- **`brand/_build/` rendering**. It needs font-shaping and SVG-rendering libraries. It is verified by rebuilding and comparing output instead; pure helpers (`contrast`, `n`, `map_path`) get tests that skip when those libraries are absent.
+
+---
+
+## 2c. Improve
+
+### High
+
+<a id="i-1"></a>
+**I-1. Piped output is lost when the cache folder cannot be written** · `squeeze.py:804` (call), `:746-756` (`save_original`), `:778-803` (the `try` that does not cover it)
+
+- **Problem.** `save_original()` runs after the `try/except` that protects the parsers. If the cache folder cannot be created or written (a read-only or full disk, a bad `LEMBAS_SQUEEZE_DIR`), the exception escapes, the CLI exits 1 with a traceback, and prints nothing.
+- **Why it matters.** With `some_command | squeeze.py`, the pipe held the only copy of that output. The documentation promises the opposite: "If squeezing fails or saves less than 30%, the input is printed unchanged" (`squeeze.py:20`, `docs/SQUEEZE.md:23`).
+- **Evidence.** `LEMBAS_SQUEEZE_DIR` set beneath a regular file: exit 1, 0 bytes on stdout, `NotADirectoryError`.
+- **Fix.** Treat a failed save as a failed squeeze: fall back to printing the input unchanged and note the reason on stderr.
+
+<a id="i-2"></a>
+**I-2. Output is lost when the terminal is not UTF-8** · `squeeze.py:837`, `ithildin.py:992-998`
+
+- **Problem.** Both scripts write through `sys.stdout` in whatever encoding the platform chose. Summaries contain `…`, `×`, `–` and `→`, and passed-through text can contain anything. A character the encoding cannot represent raises `UnicodeEncodeError` before any output is flushed.
+- **Why it matters.** On Windows, Python (before 3.15) encodes piped output with the system code page, not UTF-8. Any command output containing an emoji, a box-drawing character or non-Latin text would crash the tool and lose the output. Where it does not crash, it emits code-page bytes that a UTF-8 reader such as Claude Code decodes wrongly.
+- **Evidence.** With `PYTHONIOENCODING=cp1252`, a 20-line input containing an emoji that should pass through unchanged: exit 1, 0 bytes out. With `ascii`, every squeezed log fails on `…`. **Reproduced by simulating the encoding; not run on a real Windows machine.**
+- **Fix.** Write UTF-8 bytes explicitly in both scripts. Behaviour on macOS and Linux does not change.
+
+<a id="i-3"></a>
+**I-3. The hook summarises a partial file read as if it were the whole file** · `squeeze_hook.py:84-99`
+
+- **Problem.** `on_read_post` squeezes `tool_response.file.content` and labels the result with the file's path as "Full original". It never compares `numLines` with `totalLines`. Claude Code's Read tool returns the first 2,000 lines by default, so for a longer file the content is only the beginning. The hook then overwrites `totalLines` with the summary's own line count.
+- **Why it matters.** Column statistics are presented as facts about the file. A CSV with 5,000 data rows (103 KB, under the 256 KB limit that triggers the other hook path) was reported as "1,999 rows × 3 columns" with `sum 294,020`. The true total is 742,350. `docs/SQUEEZE.md:92` tells readers "the CSV profile's sums are exact", so the model has every reason to quote the wrong number.
+- **Evidence.** Reproduced by sending the hook a Read result with `numLines: 2000, totalLines: 5001`. **Not verified:** the exact shape of a live Read result. The official hooks reference does not document it; the fields used here are the ones this repo's own tests model.
+- **Fix.** When the read was partial (`totalLines > numLines`, or `startLine` is not 1), summarise the whole file from disk, since it is known to be under the size limit. If it cannot be read, leave the result untouched.
+
+<a id="i-4"></a>
+**I-4. Reordered PowerPoint decks get the wrong slide numbers** · `ithildin.py:360-361`
+
+- **Problem.** Slides are ordered by the number in their file name (`slide1.xml`, `slide2.xml`, …). PowerPoint does not rename those files when slides are moved; the real order is stored in `ppt/presentation.xml`.
+- **Why it matters.** Ithildin's purpose is page-cited answers. For any deck whose slides were ever dragged into a new order, "p3" is not the third slide the reader sees, so every citation can be wrong, with no warning.
+- **Evidence.** A five-slide deck with the last slide moved to the front: PowerPoint order is 5, 1, 2, 3, 4; Ithildin reports 1, 2, 3, 4, 5 as p1 to p5.
+- **Fix.** Read the slide order from `ppt/presentation.xml` and its relationships file, and fall back to file-name order if those are missing.
+
+<a id="i-5"></a>
+**I-5. Word text inside content controls is silently skipped** · `ithildin.py:302-333`
+
+- **Problem.** `extract_docx` looks only at paragraphs and tables that are direct children of the document body. Word wraps content controls (form fields, template placeholders, cover pages, generated tables of contents) in a `w:sdt` element, and everything inside is ignored.
+- **Why it matters.** Contracts, forms and templated reports use content controls heavily. The text is absent from `map`, `find` and `read`, so the model reports that a fact is "not in the document" when it is.
+- **Evidence.** A document with one normal paragraph ("rated to 10 bar") and one inside a content control ("opens at 42 bar"): `find` returns 1 hit for the first and 0 for the second.
+- **Fix.** Walk into `w:sdt`/`w:sdtContent` (and `w:customXml`) wrappers when collecting paragraphs and tables.
+- **Related, not fixed here:** footnotes, endnotes, headers and footers live in separate files inside the `.docx` and are not read. This is a documented-limits candidate rather than a bug.
+
+<a id="i-6"></a>
+**I-6. The README's install links return 404** · `README.md:8`, `:51`, `CHANGELOG.md:109-112`
+
+- **Problem.** The repository is public but has no releases and no tags. The README's main install path for the Claude apps links to `releases/latest/download/lembas.skill` and `ithildin.skill`; the changelog links to four release pages.
+- **Why it matters.** The first thing a new user is told to do does not work. The release badge is also empty.
+- **Evidence.** All three URL patterns return HTTP 404; `gh api repos/jmjohns9/Lembas/releases` returns 0 entries.
+- **Fix.** In the README rewrite (Phase 4), give the working path: build the archives with `scripts/package.sh`. Publishing a v2.1.0 release would restore the download links; that is an outward-facing action left for the maintainer to approve.
+
+### Medium
+
+| ID | Where | Problem | Why it matters | Fix |
+|---|---|---|---|---|
+| <a id="i-7"></a>I-7 | `squeeze.py:136-141`, `:772` | `detect()` runs outside the `try` and catches only `ValueError`. Deeply nested JSON raises `RecursionError`. | Piped: exit 1 and no output. As a library call, `squeeze()` raises instead of returning `None`. Same broken guarantee as I-1, rarer trigger. | Move detection inside the protected block and catch `RecursionError`. |
+| <a id="i-8"></a>I-8 | `squeeze.py:832`, `:135-141`; `squeeze_hook.py:45-47`; `ithildin.py:388`, `:466` | A UTF-8 byte-order mark (written by Excel and many Windows tools) is not removed. | BOM + JSON is not recognised as JSON and degrades to a head-and-tail text view, losing failure detection. BOM + CSV names the first column `﻿name`. BOM + Markdown loses its first heading. | Strip a leading BOM once, where text is decoded. |
+| <a id="i-9"></a>I-9 | `squeeze_hook.py:37-38` | `int(os.environ.get("LEMBAS_SQUEEZE_BUDGET", ...))` runs at import, outside `main()`'s safety net. | A typo in the variable makes the hook exit 1 with a traceback on every Bash and Read call, against its own rule that "a hook bug must never break the tool call". | Parse inside `main()`; on a bad value, warn once and use the default. |
+| <a id="i-10"></a>I-10 | `ithildin.py:658-677` | Any unrecognised extension is read as plain text: `.xlsx`, images, `.doc` when LibreOffice is absent, `.epub`/`.odt` when pandoc is absent. | The map is built from binary noise and exits 0, so the model treats garbage as the document. | Detect binary content and exit with a message naming the supported formats and the converter to install. **Behaviour change.** |
+| <a id="i-11"></a>I-11 | `ithildin.py:93`, `:292-293`, `:871`, `:970`, `:691-695`, `:76` | Tracebacks instead of messages for: a corrupt PDF, a non-zip `.docx`/`.pptx`, an invalid `--regex`, a non-numeric `ITHILDIN_MAP_BUDGET`, `read` on an empty document, and a `pdftotext` timeout. | The model reading the output gets a stack trace instead of an instruction it can act on. | Catch each at the boundary and exit with a one-line `ithildin: …` message, as `load()` already does for a missing file. |
+| <a id="i-12"></a>I-12 | `scripts/grade.py:46-48`, `:27`, `:40-41` | A missing reply file is skipped without comment, so an empty or misnamed results folder gives exit 0 with zero checks. An empty reply or missing arguments raise `IndexError`. | The CI step "Facts kept and answer structure" can pass having checked nothing, including the safety prompt. | Fail when a `lembas.md` reply is missing or no checks ran; handle empty replies; print usage. |
+| <a id="i-13"></a>I-13 | `ithildin.py:819-822`, `:855-862` | `read L9000-9100` past the end, `L20-10` and `L0` print a header and no text, exit 0. When a read is truncated, later targets in the same call are dropped without mention. | The model sees an empty section and may conclude there is nothing there; it is not told which of its targets were not read. | Reject out-of-range and reversed ranges with the valid range; list unread targets in the truncation notice. **Behaviour change** for invalid ranges. |
+| <a id="i-14"></a>I-14 | `ithildin.py:740`, `:742-755` | `--depth N` is compared with the absolute heading level. In a document whose top headings are `##`, `--depth 1` prints a header and no outline. | The documented way to shorten a map returns nothing for many Markdown files. | Interpret depth relative to the shallowest heading level. |
+| <a id="i-15"></a>I-15 | `squeeze.py:746-756`, `ithildin.py:628-635`, `:679-681` | Cache folders have fixed names under the system temp folder. An existing folder is trusted without checking who owns it. Ithildin writes cache files with default permissions (0644) and calls `chmod 0700` on whatever folder `ITHILDIN_CACHE` names. | On macOS the temp folder is per-user, so this is harmless. On Linux `/tmp` is shared: another local user can pre-create the folder, then read parsed documents or plant a cache entry. Pointing `ITHILDIN_CACHE` at an existing folder silently changes that folder's permissions. | Verify the folder is owned by the current user and not group- or world-accessible, otherwise fall back to a fresh private folder; create cache files 0600; do not `chmod` a folder the script did not create. |
+| <a id="i-16"></a>I-16 | `squeeze.py:581-584` | Currency symbols are stripped after the thousands-separator check, so `$1,234.56` and `€9,000` are not numbers, though `1,234.56` and `$1234.56` are. | A money column formatted the usual way is profiled as text: no sum, min, max or outlier flag. | Strip the currency symbol first. |
+| <a id="i-17"></a>I-17 | `squeeze.py:804-811`, `:838-840` | The original is saved to the cache before the 30% check, so a rejected summary still writes a copy of the output to disk. `--stats` then reports "26% smaller" for output that was passed through unchanged. | Needless disk writes of data that may hold secrets, and a statistic that describes something that did not happen. | Decide first, save only when the summary is used; report 0% on a pass-through. |
+| <a id="i-18"></a>I-18 | `scripts/count_tokens.py:31-37` | An empty results folder raises `ZeroDivisionError`; a folder missing `baseline.md` raises `FileNotFoundError`; files are read in the platform's default encoding. | A CI gate that crashes with a traceback instead of saying what is wrong. | Validate inputs, name the missing file, read as UTF-8. |
+| <a id="i-19"></a>I-19 | repo root | No linter, formatter or dependency manifest. `ruff --select F` finds 8 real issues (unused imports and variables, f-strings with no placeholders). | Dead code accumulates, and contributors have to read the CI file to learn what to install. | Add a minimal `ruff` configuration to `pyproject.toml` and `requirements-dev.txt`; fix the 8 findings. Reformatting all 33 files that `ruff format` would touch is **not** recommended in this branch: it would bury the real changes. |
+
+### Low
+
+| ID | Where | Problem | Fix |
+|---|---|---|---|
+| I-20 | `squeeze.py:829-830` | A missing file or a folder given as `FILE` prints a traceback. | Exit 2 with `squeeze: cannot read <path>: <reason>`. |
+| I-21 | `squeeze.py:575`, `:587-590`, `:613` | Integer columns are converted to floats, so 18-digit IDs print with wrong digits (`123,456,789,012,344,992.00` for `123456789012345000`). | Keep integers as integers. |
+| I-22 | `squeeze.py:440-441` | `True`, `1` and `1.0` are the same dictionary key in Python, so a field holding `[true, 1, 1.0, true]` is summarised as `true×4`. | Count by type and value. |
+| I-23 | `squeeze.py:620-621` | Column sums use `sum()` on floats; the docs call them exact. | Use `math.fsum`, which is correctly rounded. |
+| I-24 | `squeeze.py:834` | `hard_cap = 0` for a forced type has no effect: `hard_cap` is only read in auto mode. The comment describes behaviour that comes from elsewhere. | Remove the dead branch; fix the comment. |
+| I-25 | `squeeze.py:15`, `SKILL.md:68` | "Every error line, warning and stack trace is kept" overstates it. At most 40 distinct errors are shown (fewer when the budget is tight); the rest are counted and pointed to. `docs/SQUEEZE.md:19` says it correctly. | Align the wording with `docs/SQUEEZE.md`. |
+| I-26 | `squeeze.py:51-53`, `ithildin.py:37-40`, `scripts/count_tokens.py:19` | Three token estimators: characters ÷ 3, ÷ 3.5 and ÷ 4. Each has a stated reason, but none says the others exist, and all undercount Chinese, Japanese and Korean text. | Cross-reference them in comments and state the limitation. |
+| I-27 | `squeeze.py:36`, `ithildin.py:31` | Both report `VERSION = "1.0.0"` while the project is at 2.1.0. | Say in a comment that these are per-script versions, or align them. |
+| I-28 | `squeeze_hook.py:34` | The "already narrowed" test matches words anywhere after whitespace: `cat more.log`, `pytest -k tail`, `python tr.py` and `make less-css` all count as narrowed, as do `tail -f` and `sort`, which do not narrow. | Match commands only at the start of a pipeline segment. Effect today is limited to a higher threshold, so output is squeezed less often than intended. |
+| I-29 | `squeeze_hook.py:45-47`, `:59` | A saved output over 64 MB is cut at 64 MB with no note in the summary. | Say so in the summary header. |
+| I-30 | `ithildin.py:411` | A heading ending in `#` loses it: `## C#` becomes `C`. | Only strip a closing `#` run that follows a space, as CommonMark specifies. |
+| I-31 | `ithildin.py:891-901` | With `-C`, a hit already printed as context for the previous hit is not marked with `>`. | Mark hit lines regardless of how they were first reached. |
+| I-32 | `ithildin.py:919-962` | `table F1` (a figure id) returns the nearest table grid, labelled as that figure. | Say that figures cannot be extracted as rows and point to `read`. |
+| I-33 | `ithildin.py:444-463` | HTML: `<title>` and `<header>` text run together on one line; a `<br>` inside a heading splits it and drops the heading. | Skip `<head>`; treat `<br>` as a space inside headings. |
+| I-34 | `ithildin.py:698-704`, `:800-801`, `:600`, `:782` | Small readability items: `span()` has two identical branches; `rel_min()` only wraps `min()`; `doc.terms` is created outside `Doc.__init__`; one f-string has no placeholders. | Tidy each. |
+| I-35 | `ithildin.py:249-271` | If a PDF has bookmarks but none can be matched to text, the map says "Outline from PDF bookmarks" with zero sections. | Set the outline source only when headings were added. |
+| I-36 | `ithildin.py:330-332` | Rows of a table nested inside a table cell are listed twice. | Iterate direct rows only. |
+| I-37 | `ithildin.py:83`, `:474` | A file name starting with `-` is passed to `pdftotext`/`pandoc` where it could be read as an option. | Pass `--` before the path, or an absolute path. |
+| I-38 | `evals/generate_replies.py:44`, `:93-94`; `evals/squeeze-bench/run_e2e.py:114-122` | One failed `claude` call aborts the whole reply-generation batch; three threads write the same `eval_metadata.json`; the squeeze benchmark leaves its temp folder behind on failure (the Ithildin benchmark cleans up). | Record the failure and continue; write metadata once; use `finally`. |
+| I-39 | `scripts/grade.py:19-20`, `evals/generate_replies.py:26-27` | Two graders with different opener and closer rules. `grade.py`'s opener pattern has no word boundary, so a reply starting "Greater isolation…" is flagged as a greeting. | Share one definition; add the word boundary. |
+| I-40 | `brand/_build/icons.py:44-53`, `logo.py:199`, `guidelines.py:60`, `lib.py:208-213`, `run_all.py:4-5`, `kit.py:239` | Unused imports and variables, a loop whose body is `pass`, `write()` with no explicit encoding (non-ASCII text in files that declare UTF-8), a build that only works from its own folder, and a hard-coded `v2.1.0` badge. | Remove dead code, write UTF-8 explicitly, resolve paths from `__file__`. Confirm by rebuild that every SVG stays identical. |
+| I-41 | `.github/workflows/checks.yml:15,17` | Actions are referenced by tag (`@v4`, `@v5`), not by commit. | Pin to commit SHAs; a hygiene step, low risk for a repo with read-only token permissions. |
+
+### Found while writing tests
+
+| ID | Severity | Where | Problem | Fix |
+|---|---|---|---|---|
+| <a id="i-42"></a>I-42 | Low | `squeeze.py:181` | Python warning class names are not counted as warnings: `UserWarning: …` has severity 0, while `TypeError: …` counts as an error by its suffix. | Add the `…Warning` suffix to the warning pattern. |
+| <a id="i-43"></a>I-43 | Medium | `ithildin.py:192-220` | Running-header removal ignores digits so that "Page 12" matches "Page 13". A numbered heading that opens most pages ("1 Chapter 1", "2 Chapter 2", one chapter per page) looks like the same header and is deleted, so a PDF without bookmarks loses those sections. | **Not fixed in this branch.** A footer such as "12 Maintenance Manual" has the same shape as a heading, so any rule change needs checking against real books. Recorded as an expected-failure test. |
+| <a id="i-44"></a>I-44 | Medium | `ithildin.py:641-647` | The cache key is the file's bytes plus the script's code, not the file type. Two files with the same bytes and different extensions (`notes.md`, `notes.txt`) share an entry, so the second is given the first one's parse. | Include the lower-cased extension in the key. |
+| <a id="i-45"></a>I-45 | Low | `ithildin.py:958-961` | Without pdfplumber, `table` returns "text after the caption" but stops at the end of the caption's page. When the caption is the last line on its page, only the caption comes back. | Return the following lines regardless of the page break. |
+
+---
+
+## Checked and cleared
+
+Things that looked wrong on reading and turned out fine when run. Recorded so they are not re-investigated.
+
+| Suspicion | Result |
+|---|---|
+| The hook's `updatedToolOutput` field might not exist, making the hook a no-op | It exists and applies to built-in tools (Claude Code hooks reference, PostToolUse). A value that does not match the tool's output shape is ignored, which is why the hook copies the original result and replaces only the text. |
+| The two failing tests are caused by the missing `pdftotext` | No. The same two fail with and without poppler. The cause is the font path ([T-1](#t-1)). |
+| `squeeze_log` recomputes `template()` for every warning line (`squeeze.py:257`) | 24,364 calls for 24,000 lines: 1.5% extra. Not worth a change. |
+| `finish()` is quadratic in the number of headings (`ithildin.py:574-580`) | 110 ms for 4,200 headings. Not a practical problem. |
+| Hashing the whole document on every call is slow (`ithildin.py:641-646`) | A warm call on a 7 MB file takes 37 ms in total. |
+| `_gist` cuts sentences at abbreviations such as "Fig." | "See Fig. 3 for the layout." is kept whole, because the next character is not a capital. Did not reproduce. |
+| Brand assets might be out of sync with their build scripts | All 46 SVG, HTML and Markdown outputs regenerate byte-for-byte. The 60 PNG and ICO files differ at byte level under newer renderer versions; they were not compared visually. |
+| "Python 3.8+" might be untrue | `tests/test_squeeze.py` passes on 3.8.20, and `ithildin.py map` runs on it. |

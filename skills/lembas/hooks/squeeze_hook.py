@@ -23,6 +23,10 @@ import os
 import re
 import sys
 
+# The hook runs on every Bash and Read call. When it is switched off, stop before importing anything else.
+if __name__ == "__main__" and os.environ.get("LEMBAS_SQUEEZE", "1") == "0" and "--print-settings" not in sys.argv:
+    sys.exit(0)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 import squeeze  # noqa: E402
@@ -31,20 +35,59 @@ READ_LIMIT = 256 * 1024          # Claude Code's Read size limit
 INLINE_LIMIT = 30000             # Claude Code shows Bash output up to about this many characters inline
 # A command that already narrows its output (grep, head, sed -n, a jq filter...) is a deliberate query.
 # Its result is what Claude asked for, so it is only squeezed when it is too big to show anyway.
-NARROWING = re.compile(r"(^|[|;&(]\s*|\s)(grep|egrep|rg|ag|head|tail|sed|awk|cut|jq|yq|sort|uniq|wc|tr|column|less|more|xargs)\b")
+#
+# The name has to be in command position: at the start, after a pipe or another separator, or behind
+# a wrapper such as sudo. A file called more.log or a flag value like `-k tail` is not a query.
+NARROWING = re.compile(
+    r"(?:^|[|;&(`{!\n]|\b(?:do|then|else|if|while|until)\s|-exec(?:dir)?\s)\s*"  # where a command can start
+    r"(?:[A-Za-z_]\w*=\S*\s+)*"                                                  # VAR=value prefixes
+    # Wrappers that run another command, with their unquoted arguments (`sudo -u app`, `ssh host`,
+    # `git -C repo grep`), and a `-c "..."` script. Other quoted text is an argument, not a command.
+    r"(?:(?:sudo|time|timeout|command|nice|env|exec|nohup|watch|git|ssh|docker|kubectl|bash|sh|zsh)"
+    r"(?:\s+[^\s|;&'\"`]+)*?\s+(?:-c\s+[\"'])?)*"
+    r"(?:[\w./-]*/)?"                                                            # /usr/bin/
+    r"(?:grep|egrep|fgrep|rg|ag|head|tail|sed|awk|cut|jq|yq|sort|uniq|wc|tr|column|less|more|xargs)"
+    r"(?![\w.-])"
+)
 MAX_SCAN = 64 * 1024 * 1024      # don't load more than this from a saved output
 DATA_EXTS = {".log", ".out", ".json", ".jsonl", ".ndjson", ".csv", ".tsv"}
-BUDGET = int(os.environ.get("LEMBAS_SQUEEZE_BUDGET", squeeze.DEFAULT_BUDGET))
-THRESHOLD = int(os.environ.get("LEMBAS_SQUEEZE_THRESHOLD", squeeze.DEFAULT_THRESHOLD))
+
+
+def _setting(name, default):
+    """A whole-number setting from the environment. A bad value is reported and the default is used:
+    this runs on every tool call, so a typo in a variable must not turn into a failing hook."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        sys.stderr.write(f"lembas squeeze hook: {name}={raw!r} is not a whole number; using {default}\n")
+        return default
+
+
+BUDGET = _setting("LEMBAS_SQUEEZE_BUDGET", squeeze.DEFAULT_BUDGET)
+THRESHOLD = _setting("LEMBAS_SQUEEZE_THRESHOLD", squeeze.DEFAULT_THRESHOLD)
 
 
 def emit(obj):
     sys.stdout.write(json.dumps(obj))
 
 
-def read_text(path, limit=MAX_SCAN):
+def read_text(path, limit=None):
     with open(path, "rb") as fh:
-        return fh.read(limit).decode("utf-8", "replace")
+        return fh.read(MAX_SCAN if limit is None else limit).decode("utf-8", "replace")
+
+
+def _cut_note(path):
+    """A line to add to a summary when the file is larger than the part that was read, else ''."""
+    try:
+        if os.path.getsize(path) <= MAX_SCAN:
+            return ""
+    except OSError:   # the file went away after it was read; the summary is still good
+        return ""
+    size = f"{MAX_SCAN // 1_048_576} MB" if MAX_SCAN >= 1_048_576 else f"{MAX_SCAN // 1024} KB"
+    return f"\n[only the first {size} of {path} was read for this summary; search the file itself for anything later]"
 
 
 def on_bash(data):
@@ -65,7 +108,7 @@ def on_bash(data):
     changed = False
     view, _ = squeeze.squeeze(stdout, None, "auto", BUDGET, threshold, original)
     if view is not None:
-        new["stdout"] = view
+        new["stdout"] = view + (_cut_note(original) if original else "")
         changed = True
     stderr = resp.get("stderr") or ""
     if stderr:
@@ -81,6 +124,14 @@ def _is_slice(tool_input):
     return bool(tool_input.get("offset") or tool_input.get("limit") or tool_input.get("pages"))
 
 
+def _is_partial(f):
+    """True when a Read result holds only part of its file (Read returns the first 2,000 lines by default)."""
+    shown, total, start = f.get("numLines"), f.get("totalLines"), f.get("startLine")
+    if isinstance(shown, int) and isinstance(total, int) and total > shown:
+        return True
+    return isinstance(start, int) and start > 1
+
+
 def on_read_post(data):
     ti = data.get("tool_input") or {}
     resp = data.get("tool_response")
@@ -90,7 +141,17 @@ def on_read_post(data):
     path = f.get("filePath") or ti.get("file_path", "")
     if os.path.splitext(path)[1].lower() not in DATA_EXTS:
         return
-    view, _ = squeeze.squeeze(f.get("content") or "", path, "auto", BUDGET, THRESHOLD, path)
+    content = f.get("content") or ""
+    if _is_partial(f):
+        # The summary names the file as its original and gives counts and sums for it, so it has to
+        # describe the whole file. Summarise that from disk, or leave the partial result as it is.
+        try:
+            if os.path.getsize(path) > MAX_SCAN:
+                return
+            content = read_text(path)
+        except OSError:
+            return
+    view, _ = squeeze.squeeze(content, path, "auto", BUDGET, THRESHOLD, path)
     if view is None:
         return
     new = json.loads(json.dumps(resp))
@@ -115,7 +176,7 @@ def on_read_pre(data):
         return
     reason = (f"This file is {size / 1_048_576:.1f} MB, over the Read tool's 256 KB limit, so the lembas "
               f"squeeze hook returned a summary instead. Use grep, sed, jq or Read with offset/limit "
-              f"on {path} for exact lines.\n\n{view}")
+              f"on {path} for exact lines.\n\n{view}{_cut_note(path)}")
     emit({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                  "permissionDecisionReason": reason}})
 

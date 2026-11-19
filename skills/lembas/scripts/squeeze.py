@@ -12,7 +12,8 @@ Options:
     --stats         print size before and after to stderr
 
 Guarantees:
-    * Every error line, warning and stack trace is kept (repeats are counted, not dropped).
+    * Errors are never dropped silently. Each distinct error, warning and stack trace is shown (repeats are
+      counted), or, past the budget, the summary says how many more there are and how to list them.
     * Line numbers (L123) refer to the original, so you can grep or sed it for anything not shown.
     * The original is never modified. Piped input is saved to $LEMBAS_SQUEEZE_DIR (default
       $TMPDIR/lembas-squeeze, readable by you only) and the summary prints its path.
@@ -21,19 +22,19 @@ Guarantees:
 
 Standard library only. Python 3.8+.
 """
-import argparse
 import csv
-import hashlib
+import heapq
 import io
 import json
+import math
 import os
 import re
-import statistics
+import stat
 import sys
-import tempfile
 from collections import Counter
+from functools import lru_cache
 
-VERSION = "1.0.0"
+VERSION = "1.0.0"   # this script's own version, printed by --version; not the Lembas release number
 DEFAULT_THRESHOLD = 2000
 DEFAULT_BUDGET = 1500
 MIN_SAVING = 0.30
@@ -50,6 +51,8 @@ DATA_TYPES = {"log", "json", "jsonl", "csv"}
 
 def est_tokens(text):
     # Logs, JSON and CSV tokenize at roughly 2.5 to 3.5 characters per token, so 3 is a safe estimate.
+    # ithildin.py uses 3.5 (documents) and scripts/count_tokens.py 4 (prose replies). All three
+    # undercount Chinese, Japanese and Korean text, which runs closer to one token per character.
     return (len(text) + 2) // 3
 
 
@@ -59,8 +62,10 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)"
 
 
 def clean(text):
-    """Remove terminal color codes and progress-bar redraws. Meaning is unchanged."""
+    """Remove terminal color codes, progress-bar redraws and a leading byte-order mark. Meaning is unchanged."""
     text = ANSI.sub("", text)
+    if text.startswith("﻿"):       # written by Excel and many Windows tools; it hides JSON and renames the first CSV column
+        text = text[1:]
     if "\r" in text:
         out = []
         for line in text.split("\n"):
@@ -122,7 +127,9 @@ def _csv_shape(lines):
     return None
 
 
-def detect(text, name=None):
+def detect(text, name=None, parsed=None):
+    """The kind of `text`. When it is recognised by parsing it as JSON, the object is put in
+    parsed["json"] (if a dict is given), so the caller does not parse a large input twice."""
     ext = os.path.splitext(name or "")[1].lower()
     if ext == ".json":
         return "json"
@@ -135,9 +142,11 @@ def detect(text, name=None):
     stripped = text.lstrip()
     if stripped[:1] in "{[":
         try:
-            json.loads(stripped)
+            obj = json.loads(stripped)
+            if parsed is not None:
+                parsed["json"] = obj
             return "json"
-        except ValueError:
+        except (ValueError, RecursionError):      # not JSON, or nested too deeply to parse
             pass
     lines = text.split("\n")
     head = [l for l in lines[:50] if l.strip()]
@@ -178,7 +187,11 @@ ERR = re.compile(
     r"timed out|timeout)" + _ALONE_R +
     r"|(?-i:[A-Za-z]+(?:Error|Exception))\b|\"\s5\d\d\s|\bHTTP/\d(?:\.\d)?\"?\s5\d\d\b"
 )
-WARN = re.compile(r"(?i)" + _ALONE_L + r"(warn|warning|warnings|deprecated|deprecation|retry|retrying)" + _ALONE_R + r"|\"\s4\d\d\s")
+WARN = re.compile(r"(?i)" + _ALONE_L + r"(warn|warning|warnings|deprecated|deprecation|retry|retrying)" + _ALONE_R +
+                  r"|\"\s4\d\d\s")
+# UserWarning, ResourceWarning: named like FooError above. A separate pattern, tried only on lines that
+# contain "Warning": inside WARN it was tried at every position of every line, 9% of a log's squeeze time.
+WARNING_CLASS = re.compile(r"[A-Za-z]Warning\b")
 NOT_ERR = re.compile(
     r"(?i)\b(0|no) (errors?|failures?|failed)\b|\berrors?\s*[=:]\s*0\b|\bfailed\s*[=:]\s*0\b|\bwithout errors?\b"
 )
@@ -228,7 +241,7 @@ def _severity(line):
         return 2
     if ERR.search(line) and not NOT_ERR.search(line):
         return 2
-    if WARN.search(line):
+    if WARN.search(line) or ("Warning" in line and WARNING_CLASS.search(line)):
         return 1
     return 0
 
@@ -380,14 +393,25 @@ def _flatten(obj, prefix="", depth=0, out=None):
 
 
 def _is_bad(item):
-    flat = _flatten(item) if isinstance(item, dict) else {}
+    return isinstance(item, dict) and _is_bad_flat(_flatten(item))
+
+
+@lru_cache(maxsize=4096)
+def _key_roles(key):
+    """Whether a field name is an error, status or code field. Arrays repeat the same few names
+    thousands of times, so this is worked out once per name."""
+    leaf = key.rsplit(".", 1)[-1]
+    return leaf.lower() in ERR_KEYS, bool(STATUS_KEYS.match(leaf)), bool(CODE_KEYS.match(leaf))
+
+
+def _is_bad_flat(flat):
     for k, v in flat.items():
-        leaf = k.rsplit(".", 1)[-1]
-        if leaf.lower() in ERR_KEYS and v not in (None, "", [], {}, False, 0):
+        is_err, is_status, is_code = _key_roles(k)
+        if is_err and v not in (None, "", [], {}, False, 0):
             return True
-        if STATUS_KEYS.match(leaf) and isinstance(v, str) and BAD_VALUE.search(v):
+        if is_status and isinstance(v, str) and BAD_VALUE.search(v):
             return True
-        if CODE_KEYS.match(leaf) and isinstance(v, int) and not isinstance(v, bool) and 400 <= v <= 599:
+        if is_code and isinstance(v, int) and not isinstance(v, bool) and 400 <= v <= 599:
             return True
     return False
 
@@ -437,17 +461,17 @@ def _field_summary(values, total, str_len):
         parts.append(f"{nulls} null")
     vals = [v for v in values if _scalar(v) and v is not None]
     if vals:
-        hashable = [v if not isinstance(v, float) else round(v, 6) for v in vals]
-        distinct = Counter(hashable)
+        # True == 1 and False == 0 in Python, so booleans are counted under a key of their own.
+        distinct = Counter((isinstance(v, bool), round(v, 6) if isinstance(v, float) else v) for v in vals)
         nums = [v for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
         if len(distinct) <= 8:
-            parts.append(", ".join(f"{_fmt(v, 40)}×{c}" for v, c in distinct.most_common()))
+            parts.append(", ".join(f"{_fmt(v, 40)}×{c}" for (_, v), c in distinct.most_common()))
         elif nums and len(nums) == len(vals):
             uniq = " (unique)" if len(distinct) == len(vals) else ""
             parts.append(f"{_num(min(nums))}…{_num(max(nums))}{uniq}")
         else:
             uniq = "unique" if len(distinct) == len(vals) else f"{len(distinct):,} distinct"
-            ex = ", ".join(_fmt(v, str_len) for v, _ in distinct.most_common(2))
+            ex = ", ".join(_fmt(v, str_len) for (_, v), _ in distinct.most_common(2))
             parts.append(f"{uniq}, e.g. {ex}")
     lists = [v for v in values if isinstance(v, list)]
     if lists:
@@ -457,7 +481,28 @@ def _field_summary(values, total, str_len):
     return ", ".join(parts)
 
 
-def _render_json(v, path, depth, L, out, ind):
+def _array_facts(arr, cache):
+    """What _render_array needs about an array that does not depend on the detail level. squeeze_json
+    renders at up to five levels, so this is worked out once per array: each object is flattened once,
+    for both its fields and the failure check, and each field's values are gathered in one pass."""
+    if id(arr) in cache:
+        return cache[id(arr)]
+    flats, bad = [], []
+    for i, x in enumerate(arr):
+        if isinstance(x, dict):
+            flat = _flatten(x)
+            flats.append(flat)
+            if _is_bad_flat(flat):
+                bad.append(i)
+    values = {}   # field -> its values, in item order; keys in order of first appearance
+    for flat in flats:
+        for k, v in flat.items():
+            values.setdefault(k, []).append(v)
+    cache[id(arr)] = flats, values, bad
+    return cache[id(arr)]
+
+
+def _render_json(v, path, depth, L, out, ind, cache):
     pad = "  " * ind
     if isinstance(v, dict):
         if depth >= L["depth"]:
@@ -481,16 +526,16 @@ def _render_json(v, path, depth, L, out, ind):
                 out.append(f"{pad}{k}: {{}}")
             elif isinstance(x, dict):
                 out.append(f"{pad}{k}:")
-                _render_json(x, sub, depth + 1, L, out, ind + 1)
+                _render_json(x, sub, depth + 1, L, out, ind + 1, cache)
             else:
-                _render_array(x, sub, depth + 1, L, out, ind, label=k)
+                _render_array(x, sub, depth + 1, L, out, ind, k, cache)
     elif isinstance(v, list):
-        _render_array(v, path, depth, L, out, ind, label=None)
+        _render_array(v, path, depth, L, out, ind, None, cache)
     else:
         out.append(f"{pad}{_fmt(v, L['str'])}")
 
 
-def _render_array(arr, path, depth, L, out, ind, label):
+def _render_array(arr, path, depth, L, out, ind, label, cache):
     pad = "  " * ind
     name = f"{label}: " if label is not None else ""
     n = len(arr)
@@ -503,27 +548,23 @@ def _render_array(arr, path, depth, L, out, ind, label):
         else:
             out.append(f"{pad}{name}array[{n}] at {path or '.'}: {_field_summary(arr, n, L['str'])}")
         return
-    dicts = [x for x in arr if isinstance(x, dict)]
-    out.append(f"{pad}{name}array[{n}] of {'objects' if len(dicts) == n else 'mixed'} at {path or '.'}")
+    flats, values, bad = _array_facts(arr, cache)
+    out.append(f"{pad}{name}array[{n}] of {'objects' if len(flats) == n else 'mixed'} at {path or '.'}")
     pad2 = pad + "  "
-    if dicts and depth < L["depth"] + 1:
-        flats = [_flatten(d) for d in dicts]
-        fields = {}
-        for f in flats:
-            for k in f:
-                fields.setdefault(k, None)
-        keys = list(fields)
+    if flats and depth < L["depth"] + 1:
+        keys = list(values)
         out.append(f"{pad2}fields ({len(keys)}):")
+        rare_below = max(1, 0.05 * len(flats)) if len(flats) >= 20 else 0
         shown = 0
         for k in keys:
-            vals = [f[k] for f in flats if k in f]
-            if len(vals) < max(1, 0.05 * len(flats)) and len(flats) >= 20:
+            vals = values[k]
+            if len(vals) < rare_below:
                 continue  # rare fields are listed separately
             if shown >= L["fields"]:
                 break
             out.append(f"{pad2}  {k}: {_field_summary(vals, len(flats), L['str'])}")
             shown += 1
-        common = [k for k in keys if not (len(flats) >= 20 and sum(k in f for f in flats) < max(1, 0.05 * len(flats)))]
+        common = [k for k in keys if len(values[k]) >= rare_below]
         if len(common) > shown:
             out.append(f"{pad2}  … +{len(common) - shown} more fields: {', '.join(common[shown:shown + 12])}")
         rare = [k for k in keys if k not in common]
@@ -531,12 +572,11 @@ def _render_array(arr, path, depth, L, out, ind, label):
             desc = []
             for k in rare[:6]:
                 idx = [i for i, f in enumerate(flats) if k in f][:4]
-                desc.append(f"{k} (in {sum(k in f for f in flats)} items, e.g. [{', '.join(map(str, idx))}])")
+                desc.append(f"{k} (in {len(values[k])} items, e.g. [{', '.join(map(str, idx))}])")
             out.append(f"{pad2}rare fields: {'; '.join(desc)}")
     if L["samples"]:
         out.append(f"{pad2}[0]:")
-        _render_json(arr[0], f"{path}[0]", depth + 1, L, out, ind + 2)
-    bad = [i for i, x in enumerate(arr) if _is_bad(x)]
+        _render_json(arr[0], f"{path}[0]", depth + 1, L, out, ind + 2, cache)
     if bad:
         out.append(f"{pad2}items that look like errors or failures: {len(bad)} (indexes {', '.join(map(str, bad[:12]))}{'…' if len(bad) > 12 else ''})")
         for i in bad[: L["bad"]]:
@@ -554,9 +594,10 @@ def squeeze_json(obj, budget, kind="json"):
         dict(depth=2, keys=8, fields=8, str=30, samples=0, bad=2, line=120),
     ]
     body = ""
+    cache = {}   # per-array facts shared by every detail level; obj is alive throughout, so ids are stable
     for L in levels:
         out = []
-        _render_json(obj, "", 0, L, out, 0)
+        _render_json(obj, "", 0, L, out, 0, cache)
         body = "\n".join(out)
         if est_tokens(body) <= budget:
             break
@@ -578,13 +619,37 @@ DATE_RE = re.compile(r"^\d{4}[-/]\d{2}[-/]\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?
 BOOL = {"true", "false", "yes", "no", "t", "f", "y", "n"}
 
 
+THOUSANDS_RE = re.compile(r"^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$")
+CURRENCY = "$€£"
+
+
 def _num_value(s):
-    s = s.strip().replace(",", "") if s.count(",") and re.match(r"^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$", s.strip()) else s.strip()
-    s = s.lstrip("$€£")
+    """The number a cell holds, or None. Accepts a currency symbol, a sign before it and thousands separators."""
+    s = s.strip()
+    sign = ""
+    if s[:1] in ("+", "-") and s[1:2] and s[1:2] in CURRENCY:      # -$5.00
+        sign, s = s[0], s[1:]
+    # The symbol comes off first, so that "$1,234.56" is seen as a number with separators.
+    s = sign + s.lstrip(CURRENCY).lstrip()
+    if "," in s and THOUSANDS_RE.match(s):
+        s = s.replace(",", "")
     return float(s) if FLOAT_RE.match(s) else None
 
 
+def _num_values(cells):
+    """Every cell as a number, or None as soon as one is not. Each cell is parsed once."""
+    out = []
+    for v in cells:
+        x = _num_value(v)
+        if x is None:
+            return None
+        out.append(x)
+    return out
+
+
 def _numfmt(x):
+    if isinstance(x, int):
+        return f"{x:,}"                 # exact at any size; a float would round an 18-digit ID
     if x == int(x) and abs(x) < 1e15:
         return f"{x:,.0f}"
     return f"{x:,.2f}" if abs(x) >= 100 else f"{x:,.6g}"
@@ -592,43 +657,48 @@ def _numfmt(x):
 
 def _profile_column(vals, line_nos, str_len):
     total = len(vals)
-    present = [(v.strip(), ln) for v, ln in zip(vals, line_nos) if v.strip().lower() not in NULLS]
+    present = [(s, ln) for s, ln in ((v.strip(), ln) for v, ln in zip(vals, line_nos)) if s.lower() not in NULLS]
     nulls = total - len(present)
     p = [v for v, _ in present]
     if not p:
         return "empty", nulls, "all null", []
     if all(INT_RE.match(v) for v in p):
         kind = "int"
-    elif all(_num_value(v) is not None for v in p):
-        kind = "float"
-    elif all(DATE_RE.match(v) for v in p):
-        kind = "date"
-    elif all(v.lower() in BOOL for v in p):
-        kind = "bool"
+        # Whole-number columns stay integers, so IDs and counts beyond 2**53 keep every digit.
+        nums = [int(v) for v in p]
     else:
-        kind = "text"
+        nums = _num_values(p)
+        kind = ("float" if nums is not None else "date" if all(DATE_RE.match(v) for v in p)
+                else "bool" if all(v.lower() in BOOL for v in p) else "text")
     distinct = Counter(p)
     flags = []
     if kind in ("int", "float"):
-        nums = [_num_value(v) for v in p]
         lo, hi = min(nums), max(nums)
         fmt = _numfmt
         unique = len(distinct) == len(p)
         if unique and kind == "int" and len(p) > 20:
             summary = f"{fmt(lo)}…{fmt(hi)}, unique (likely an ID)"
         else:
+            # fsum is correctly rounded. Plain sum() on floats is only accurate from Python 3.12, so
+            # using it would make the same file print different totals on different versions.
+            total = sum(nums) if kind == "int" else math.fsum(nums)
+            import statistics   # here, not at the top: the hook imports this module on every tool call
             summary = (f"min {fmt(lo)}, max {fmt(hi)}, mean {fmt(statistics.fmean(nums))}, "
-                       f"median {fmt(statistics.median(nums))}, sum {fmt(sum(nums))}")
+                       f"median {fmt(statistics.median(nums))}, sum {fmt(total)}")
             if len(distinct) <= 6:
                 summary = ", ".join(f"{v}×{c}" for v, c in distinct.most_common()) + "; " + summary
             # Flag a value only when it is far from everything else (a shifted decimal, a sentinel
             # like -1 or 999999). Skewed but real distributions don't trigger this.
-            ranked = sorted(zip(nums, (ln for _, ln in present)), key=lambda t: t[0])
-            if len(ranked) >= 10:
-                (top, top_ln), (nxt, _) = ranked[-1], ranked[-2]
+            # Only the two largest and two smallest are needed, so no full sort. Ties go to the last
+            # maximum and the first minimum, by position in the file.
+            if len(nums) >= 10:
+                order = range(len(nums))
+                i_top, i_nxt = heapq.nlargest(2, order, key=lambda i: (nums[i], i))
+                top, top_ln, nxt = nums[i_top], present[i_top][1], nums[i_nxt]
                 if nxt > 0 and top >= 5 * nxt:
                     flags.append(f"max {fmt(top)} at L{top_ln} is {top / nxt:,.1f}× the next largest ({fmt(nxt)})")
-                (bot, bot_ln), (nxt_lo, _) = ranked[0], ranked[1]
+                i_bot, i_nxt = heapq.nsmallest(2, order, key=lambda i: (nums[i], i))
+                bot, bot_ln, nxt_lo = nums[i_bot], present[i_bot][1], nums[i_nxt]
                 if bot < 0 <= nxt_lo:
                     flags.append(f"min {fmt(bot)} at L{bot_ln} is the only negative value")
     elif kind == "date":
@@ -743,17 +813,55 @@ HINTS = {
 }
 
 
-def save_original(text, kind, cache_dir=None):
-    cache_dir = cache_dir or os.environ.get("LEMBAS_SQUEEZE_DIR") or os.path.join(tempfile.gettempdir(), "lembas-squeeze")
-    # Command output can contain secrets, so the cache is readable by the current user only.
-    os.makedirs(cache_dir, mode=0o700, exist_ok=True)
+def _private_temp_dir(name):
+    """A folder for `name` under the system temp folder that only the current user can read.
+
+    The temp folder is shared, so another user could have made a folder of that name first and would
+    then be able to read everything written into it. Such a folder is not used: `name-<uid>` is tried
+    next, so later runs find the same folder, and a new private one is made only if that fails too."""
+    import tempfile
+    names = [name] + ([f"{name}-{os.getuid()}"] if hasattr(os, "getuid") else [])
+    for n in names:
+        d = os.path.join(tempfile.gettempdir(), n)
+        try:
+            os.makedirs(d, mode=0o700, exist_ok=True)
+        except OSError:   # a file of that name is in the way
+            continue
+        if hasattr(os, "getuid"):
+            st = os.lstat(d)
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                continue
+        try:
+            os.chmod(d, 0o700)
+        except OSError:
+            pass
+        return d
+    return tempfile.mkdtemp(prefix=name + "-")
+
+
+def _cache_path(text, kind, cache_dir=None):
+    """Where the original of `text` is kept. The name is a hash of the content, so it can be worked
+    out, and quoted in a summary, before anything is written."""
+    cache_dir = cache_dir or os.environ.get("LEMBAS_SQUEEZE_DIR") or _private_temp_dir("lembas-squeeze")
     ext = {"log": ".log", "json": ".json", "jsonl": ".jsonl", "csv": ".csv"}.get(kind, ".txt")
-    path = os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
+    import hashlib
+    return os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
+
+
+def _store(text, path):
+    """Write `text` to `path` unless it is already there. Returns the path."""
+    # Command output can contain secrets, so the cache is readable by the current user only.
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     if not os.path.exists(path):
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
     return path
+
+
+def save_original(text, kind, cache_dir=None):
+    """Keep the full text in the cache and return its path."""
+    return _store(text, _cache_path(text, kind, cache_dir))
 
 
 def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAULT_THRESHOLD,
@@ -768,8 +876,13 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
     info = {"kind": kind, "before": before, "after": before}
     if before <= threshold:
         return None, info
+    parsed = {}   # filled by detect() when it had to parse JSON to recognise it
     if kind == "auto":
-        kind = detect(text, name)
+        try:
+            kind = detect(text, name, parsed)
+        except Exception as exc:  # detection is a guess; a failure here must not lose the output
+            info["error"] = repr(exc)
+            kind = "text"
         info["kind"] = kind
         if kind not in DATA_TYPES and before <= hard_cap:
             return None, info
@@ -777,7 +890,7 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
         kind = "text"
     try:
         if kind == "json":
-            body, facts = squeeze_json(json.loads(text), budget, "json")
+            body, facts = squeeze_json(parsed["json"] if "json" in parsed else json.loads(text), budget, "json")
         elif kind == "jsonl":
             recs = []
             for l in text.split("\n"):
@@ -801,18 +914,50 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
             kind = "text"
         except Exception:
             return None, info
-    path = original_path or save_original(text, kind)
-    header = (f"[lembas squeeze: {kind}, {facts}. ~{before:,} tokens shown as a summary. "
-              f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}. Lines marked L123 are original line numbers.]")
-    view = header + "\n" + body
-    after = est_tokens(view)
-    info.update(kind=kind, after=after, path=path)
-    if after > before * (1 - MIN_SAVING):
+    def with_header(path):
+        return (f"[lembas squeeze: {kind}, {facts}. ~{before:,} tokens shown as a summary. "
+                f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}. Lines marked L123 are original line numbers.]"
+                "\n" + body)
+
+    # Decide whether the summary is worth using before anything is written: output that is passed
+    # through needs no saved copy, and command output can hold secrets.
+    # A summary must point at the full text. With nowhere to keep it, pass the input through.
+    try:
+        path = original_path or _cache_path(text, kind)
+    except OSError as exc:
+        info["error"] = f"could not save the original: {exc!r}"
         return None, info
+    view = with_header(path)
+    info.update(kind=kind, after=est_tokens(view))
+    if info["after"] > before * (1 - MIN_SAVING):
+        return None, info
+    if not original_path:
+        try:
+            _store(text, path)
+        except OSError as exc:
+            info["error"] = f"could not save the original: {exc!r}"
+            return None, info
+    info["path"] = path
     return view, info
 
 
+def _write(stream, text):
+    """Write text as UTF-8, whatever encoding the terminal reports.
+
+    The reader is Claude or a pipe into it, both of which expect UTF-8. Python would otherwise use
+    the system code page on Windows and fail on, or mis-encode, any character outside it.
+    """
+    raw = getattr(stream, "buffer", None)
+    if raw is None:                     # a text-only stream, such as io.StringIO in tests
+        stream.write(text)
+        return
+    stream.flush()
+    raw.write(text.encode("utf-8", "replace"))
+    raw.flush()
+
+
 def main(argv=None):
+    import argparse
     ap = argparse.ArgumentParser(description="Shrink large logs, JSON and CSV before an LLM reads them.")
     ap.add_argument("file", nargs="?", default="-")
     ap.add_argument("--type", default="auto", choices=["auto", "log", "json", "jsonl", "csv", "text"])
@@ -826,18 +971,25 @@ def main(argv=None):
         raw = sys.stdin.buffer.read()
         name, original = None, None
     else:
-        with open(args.file, "rb") as fh:
-            raw = fh.read()
+        try:
+            with open(args.file, "rb") as fh:
+                raw = fh.read()
+        except OSError as exc:
+            _write(sys.stderr, f"squeeze: cannot read {args.file}: {exc.strerror or exc}\n")
+            return 2
         name, original = args.file, os.path.abspath(args.file)
     text = raw.decode("utf-8", "replace")
-    # A forced type means the caller asked for a summary, so skip the code and prose guard.
-    hard_cap = 0 if args.type != "auto" else 40000
-    view, info = squeeze(text, name, args.type, args.budget, args.threshold, original, hard_cap)
+    # A forced --type always gets a summary: squeeze() applies its code-and-prose guard only in auto mode.
+    view, info = squeeze(text, name, args.type, args.budget, args.threshold, original)
     out = view if view is not None else clean(text)
-    sys.stdout.write(out if out.endswith("\n") else out + "\n")
-    if args.stats:
-        pct = 100 * (1 - info["after"] / info["before"]) if info["before"] else 0
-        sys.stderr.write(f"squeeze: {info['kind']}, ~{info['before']:,} → ~{info['after']:,} tokens ({pct:.0f}% smaller)\n")
+    _write(sys.stdout, out if out.endswith("\n") else out + "\n")
+    if view is None and "error" in info:
+        _write(sys.stderr, f"squeeze: {info['error']}; the input was printed unchanged\n")
+    if args.stats and view is None:
+        _write(sys.stderr, f"squeeze: {info['kind']}, ~{info['before']:,} tokens, passed through unchanged\n")
+    elif args.stats:
+        pct = 100 * (1 - info["after"] / info["before"])
+        _write(sys.stderr, f"squeeze: {info['kind']}, ~{info['before']:,} → ~{info['after']:,} tokens ({pct:.0f}% smaller)\n")
     return 0
 
 

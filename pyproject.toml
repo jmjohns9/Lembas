@@ -1,0 +1,32 @@
+# Tool configuration only. Lembas is not a Python package: the skills are plain scripts that run
+# on the standard library, so there is nothing here to build or install.
+
+[tool.coverage.run]
+source = ["skills", "scripts"]
+parallel = true
+# The hook and both command-line tools are tested through subprocesses; measure those too.
+patch = ["subprocess"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[tool.ruff]
+target-version = "py38"
+line-length = 120
+# Set explicitly: ruff's default list skips any folder named "_build", which would hide brand/_build.
+exclude = [".git", ".venv", "dist", "__pycache__"]
+
+[tool.ruff.lint]
+# Errors that are bugs or dead code. Style rules and reformatting are deliberately left out:
+# see docs/CODE_REVIEW.md, finding I-19.
+select = ["E4", "E7", "E9", "F"]
+# E741 flags the name "l", used throughout for a line of text in short comprehensions.
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# One-off scripts kept exactly as they were run for the recorded caveman benchmark.
+"evals/caveman-bench/scripts/*.py" = ["E401", "E402", "E701", "E702"]
+# One-line `if` statements and a lambda in the board layout scripts.
+"brand/_build/overview.py" = ["E701", "E731"]
+"brand/_build/review.py" = ["E401", "E702"]

@@ -17,13 +17,20 @@ HOOK = os.path.join(SKILL, "hooks", "squeeze_hook.py")
 FIXTURES = tempfile.mkdtemp(prefix="lembas-fixtures-")
 subprocess.run([sys.executable, os.path.join(ROOT, "tests", "make_fixtures.py"), FIXTURES],
                check=True, stdout=subprocess.DEVNULL)
-ANSWERS = json.load(open(os.path.join(FIXTURES, "answers.json")))
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+ANSWERS = json.loads(read(os.path.join(FIXTURES, "answers.json")))
 os.environ["LEMBAS_SQUEEZE_DIR"] = tempfile.mkdtemp(prefix="lembas-cache-")
 
 
 def view_of(name, **kw):
     path = os.path.join(FIXTURES, name)
-    text = open(path).read()
+    text = read(path)
     view, info = squeeze.squeeze(text, path, original_path=path, **kw)
     return view, info
 
@@ -87,7 +94,7 @@ class Logs(unittest.TestCase):
         self.assertIn(f"repeats {self.facts['redis_connection_errors']}×", self.view)
 
     def test_line_numbers_match_original(self):
-        lines = open(os.path.join(FIXTURES, "app.log")).read().split("\n")
+        lines = read(os.path.join(FIXTURES, "app.log")).split("\n")
         for row in self.view.split("\n"):
             if row.startswith("L") and " " in row:
                 num, text = row.split(" ", 1)
@@ -155,7 +162,7 @@ class Csv(unittest.TestCase):
 
 class Hook(unittest.TestCase):
     def test_bash_large_output_replaced(self):
-        text = open(os.path.join(FIXTURES, "app.log")).read()[:200000]
+        text = read(os.path.join(FIXTURES, "app.log"))[:200000]
         out = run_hook({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "cat app.log"},
                         "tool_response": {"stdout": text, "stderr": "", "interrupted": False, "isImage": False}})
         new = out["hookSpecificOutput"]["updatedToolOutput"]
@@ -175,7 +182,7 @@ class Hook(unittest.TestCase):
         payload = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "ls"},
                    "tool_response": {"stdout": "a\nb\n", "stderr": ""}}
         self.assertIsNone(run_hook(payload))
-        big = open(os.path.join(FIXTURES, "app.log")).read()[:100000]
+        big = read(os.path.join(FIXTURES, "app.log"))[:100000]
         payload = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "LEMBAS_RAW=1 cat app.log"},
                    "tool_response": {"stdout": big, "stderr": ""}}
         self.assertIsNone(run_hook(payload))
@@ -184,7 +191,7 @@ class Hook(unittest.TestCase):
 
     def test_read_post_and_slices(self):
         path = os.path.join(FIXTURES, "sales.csv")
-        content = "".join(open(path).readlines()[:3000])
+        content = "".join(read(path).splitlines(keepends=True)[:3000])
         resp = {"type": "text", "file": {"filePath": path, "content": content, "numLines": 3000, "startLine": 1, "totalLines": 3000}}
         out = run_hook({"hook_event_name": "PostToolUse", "tool_name": "Read", "tool_input": {"file_path": path}, "tool_response": resp})
         f = out["hookSpecificOutput"]["updatedToolOutput"]["file"]
@@ -211,12 +218,12 @@ class Hook(unittest.TestCase):
 
 class Cli(unittest.TestCase):
     def test_pipe_saves_original(self):
-        text = open(os.path.join(FIXTURES, "app.log")).read()
+        text = read(os.path.join(FIXTURES, "app.log"))
         r = subprocess.run([sys.executable, os.path.join(SKILL, "scripts", "squeeze.py")], input=text,
                            capture_output=True, text=True)
         header = r.stdout.split("\n", 1)[0]
         path = header.split("Full original: ", 1)[1].split(" ;", 1)[0]
-        self.assertEqual(open(path).read(), text)
+        self.assertEqual(read(path), text)
         self.assertEqual(os.stat(path).st_mode & 0o777, 0o600, "saved output must be private")
         self.assertEqual(os.stat(os.path.dirname(path)).st_mode & 0o777, 0o700)
 

@@ -10,6 +10,10 @@ evals/scratch/
 __pycache__/
 *.pyc
 .venv/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
 
 # OS and editor files
 .DS_Store

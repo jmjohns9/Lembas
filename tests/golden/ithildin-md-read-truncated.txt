@@ -1,0 +1,15 @@
+[ithildin read: 7 Cooling System, L688-816]
+7 Cooling System
+Inspect the drive belt before each shift. Check the bearing set using the approved solvent; the nominal value is 72 mm. Record the filter housing with a calibrated gauge. Check the control panel using the approved solvent.
+7.1 Description
+Check the controller to the specified torque; the nominal value is 600 N·m. Lubricate the relief valve after the first 50 hours. Torque values apply to clean, lightly oiled threads. Check the control panel with a calibrated gauge. Inspect the intake manifold for leaks at the joints. Lubricate the intake manifold to the specified torque.
+Record the sensor harness and log the reading in the maintenance record; the nominal value is 82 rpm. Tighten the relief valve against the reference values. Measure the exhaust bypass for wear and scoring. Do not reuse gaskets or self-locking nuts. Inspect the sensor harness before each shift; the nominal value is 644 V. Tighten the coolant loop to the specified torque; the nominal value is 176 kPa.
+Tighten the filter housing and log the reading in the maintenance record. Clean the gearbox for leaks at the joints. Record the intake manifold before each shift; the nominal value is 371 rpm. Measure the gearbox with the unit isolated. Torque values apply to clean, lightly oiled threads. Lubricate the fuel rail for leaks at the joints.
+Table 25. Reference values for description
+| Item | Interval | Limit | Action |
+| Control Panel | 650 h | 26 kPa | Verify |
+| Drive Belt | 950 h | 55 % | Tighten |
+| Bearing Set | 100 h | 3 % | Verify |
+| Filter Housing | 100 h | 61 kPa | Measure |
+| Sensor Harness | 900 h | 25 % | Clean |
+[truncated at L701 to stay under 500 tokens. Continue with: read FILE L701-816 or by subsection: 7.2, 7.3, 7.4]

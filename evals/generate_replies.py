@@ -28,7 +28,8 @@ CLOSERS = re.compile(r"(let me know|hope this helps|feel free to|happy to help|a
 
 
 def body(path):
-    text = open(path).read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     return text.split("---", 2)[2].strip() if text.startswith("---") else text
 
 
@@ -92,17 +93,21 @@ def main():
         os.makedirs(os.path.join(d, arm, "outputs"), exist_ok=True)
         json.dump({"eval_id": ev["id"], "eval_name": name, "prompt": ev["prompt"],
                    "assertions": ev.get("must_contain", [])}, open(os.path.join(d, "eval_metadata.json"), "w"), indent=2)
-        text, out_tokens, secs = call(ev["prompt"], arms[arm])
-        open(os.path.join(d, arm, "outputs", "response.md"), "w").write(text)
+        try:
+            text, out_tokens, secs = call(ev["prompt"], arms[arm])
+        except Exception as exc:  # a timeout or a reply that is not JSON must not stop the other jobs
+            return name, arm, f"error: {type(exc).__name__}"
+        with open(os.path.join(d, arm, "outputs", "response.md"), "w", encoding="utf-8") as f:
+            f.write(text)
         json.dump({"total_tokens": out_tokens, "duration_ms": int(secs * 1000), "total_duration_seconds": round(secs, 1)},
                   open(os.path.join(d, arm, "timing.json"), "w"), indent=2)
         g = grade(ev, text)
         json.dump(g, open(os.path.join(d, arm, "grading.json"), "w"), indent=2)
-        return name, arm, out_tokens, g["summary"]["pass_rate"]
+        return name, arm, f"{out_tokens:6} out tokens  pass {g['summary']['pass_rate']:.0%}"
 
     with ThreadPoolExecutor(a.workers) as ex:
-        for name, arm, tok, rate in ex.map(work, jobs):
-            print(f"{name:34} {arm:14} {tok:6} out tokens  pass {rate:.0%}", flush=True)
+        for name, arm, status in ex.map(work, jobs):
+            print(f"{name:34} {arm:14} {status}", flush=True)
 
 
 if __name__ == "__main__":

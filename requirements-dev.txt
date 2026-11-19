@@ -1,0 +1,19 @@
+# Development and test dependencies.
+#
+# The skills themselves need only the Python standard library. These packages are used to build
+# the Ithildin test documents, to exercise its optional PDF paths, and to measure and lint the code.
+# Versions are pinned to the set the suite was last verified against, so CI is reproducible.
+#
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+#
+# PDF tests also use poppler's pdftotext when it is installed (apt install poppler-utils,
+# brew install poppler). Without it Ithildin falls back to pypdf, and the tests still pass.
+
+pypdf==7.1.0
+pdfplumber==0.11.10
+reportlab==5.1.0
+python-docx==1.2.0
+python-pptx==1.0.2
+
+coverage==7.17.3
+ruff==0.17.5

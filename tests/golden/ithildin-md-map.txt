@@ -1,0 +1,80 @@
+[ithildin map: manual.md (Markdown, 64,925 words, ~108,858 tokens). 58 sections, 52 tables, 0 figures. Outline from Markdown headings. Read parts: ithildin.py read FILE <id|p12-14|L40-90>. Search: ithildin.py find FILE "term" "other term".]
+S1 ACME X-200 Maintenance Manual | L1-1390 | 64,925w
+  1 General Information | L2-123 | 5,853w | Record the filter housing for wear and scoring; the nominal value is 558 kPa.
+    1.1 Scope | L4-33 | 1,418w | Measure the pump assembly after the first 50 hours; the nominal value is 889 mm.
+    1.2 Safety Conventions | L34-63 | 1,472w | Measure the control panel with a calibrated gauge.
+    1.3 Definitions | L64-93 | 1,473w | Lubricate the controller for leaks at the joints; the nominal value is 117 rpm.
+    1.4 Related Documents | L94-123 | 1,440w | Lubricate the relief valve and log the reading in the maintenance record; the nominal value is 227 mm.
+  2 Product Description | L124-222 | 4,511w | Measure the hydraulic line to the specified torque.
+    2.1 Overview | L126-155 | 1,486w | Calibrate the fuel rail before each shift.
+    2.2 Major Assemblies | L156-185 | 1,476w | Record the relief valve for wear and scoring; the nominal value is 736 mm.
+    2.3 Operating Principles | L186-222 | 1,503w | Verify the pump assembly for leaks at the joints; the nominal value is 548 rpm.
+  3 Installation | L223-351 | 5,861w | Measure the bearing set against the reference values.
+    3.1 Site Requirements | L225-254 | 1,418w | Replace the mounting bracket and log the reading in the maintenance record; the nominal value is 81 L/min.
+    3.2 Foundation and Mounting | L255-284 | 1,428w | Record the fuel rail with a calibrated gauge.
+    3.3 Electrical Connections | L285-321 | 1,492w | Operators should allow the unit to cool before opening any panel.
+    3.4 Commissioning | L322-351 | 1,486w | Do not reuse gaskets or self-locking nuts.
+  4 Operation | L352-473 | 5,897w | Use only parts listed in the illustrated parts catalog.
+    4.1 Controls and Indicators | L354-376 | 1,379w | Torque values apply to clean, lightly oiled threads.
+    4.2 Starting Procedure | L377-406 | 1,503w | Replace the coolant loop against the reference values.
+    4.3 Normal Operation | L407-443 | 1,527w | Check the relief valve for wear and scoring.
+    4.4 Shutdown | L444-473 | 1,447w | Measure the control panel and log the reading in the maintenance record; the nominal value is 693 mm.
+  5 Scheduled Maintenance | L474-602 | 6,110w | Measure the fuel rail using the approved solvent.
+    5.1 Daily Checks | L476-512 | 1,585w | Measure the control panel against the reference values; the nominal value is 66 kPa.
+    5.2 Weekly Checks | L513-549 | 1,496w | Verify the drive belt for wear and scoring; the nominal value is 353 kPa.
+    5.3 Service Interval Tasks | L550-579 | 1,557w | Replace the filter housing and log the reading in the maintenance record.
+    5.4 Annual Overhaul | L580-602 | 1,420w | Tighten the pump assembly with a calibrated gauge; the nominal value is 645 mm.
+  6 Lubrication System | L603-687 | 4,363w | Measure the filter housing after the first 50 hours; the nominal value is 870 mm.
+    6.1 Oil Specification | L605-634 | 1,451w | Use only parts listed in the illustrated parts catalog.
+    6.2 Oil Change Procedure | L635-657 | 1,437w | Record the exhaust bypass after the first 50 hours.
+    6.3 Filter Replacement | L658-687 | 1,420w | Calibrate the mounting bracket for wear and scoring.
+  7 Cooling System | L688-816 | 6,012w | Inspect the drive belt before each shift.
+    7.1 Description | L690-719 | 1,488w | Check the controller to the specified torque; the nominal value is 600 N·m.
+    7.2 Coolant Specification | L720-749 | 1,483w | Allow sealant to cure for at least four hours before startup.
+    7.3 Operating Limits | L750-779 | 1,458w | Calibrate the intake manifold after the first 50 hours; the nominal value is 164 N·m.
+    7.4 Draining and Refilling | L780-816 | 1,543w | Verify the controller for wear and scoring; the nominal value is 898 N·m.
+  8 Fuel System | L817-901 | 4,363w | Replace the control panel before each shift; the nominal value is 397 V.
+    8.1 Fuel Requirements | L819-848 | 1,489w | Check the sensor harness before each shift.
+    8.2 Injector Service | L849-878 | 1,474w | Clean the pump assembly for wear and scoring.
+    8.3 Fuel Filter Service | L879-901 | 1,354w | Tighten the mounting bracket with the unit isolated; the nominal value is 538 kPa.
+  9 Engine Mechanical | L902-1029 | 5,999w | Calibrate the coolant loop with the unit isolated; the nominal value is 389 N·m.
+    9.1 Cylinder Head Removal | L904-926 | 1,476w | Replace the sensor harness with the unit isolated; the nominal value is 208 rpm.
+    9.2 Valve Adjustment | L927-963 | 1,504w | Inspect the coolant loop for wear and scoring; the nominal value is 82 rpm.
+    9.3 Timing Belt | L964-1000 | 1,555w | Clean the drive belt after the first 50 hours.
+    9.4 Torque Specifications | L1001-1029 | 1,417w | Measure the coolant loop after the first 50 hours; the nominal value is 78 N·m.
+  10 Electrical System | L1030-1135 | 4,562w | Clean the sensor harness to the specified torque; the nominal value is 662 kPa.
+    10.1 Wiring Overview | L1032-1068 | 1,523w | Record the gearbox with a calibrated gauge.
+    10.2 Battery Care | L1069-1098 | 1,442w | Tighten the coolant loop against the reference values; the nominal value is 364 kPa.
+    10.3 Fault Codes | L1099-1135 | 1,557w | Calibrate the relief valve using the approved solvent; the nominal value is 221 N·m.
+  11 Warranty | L1136-1234 | 4,643w | Verify the pump assembly using the approved solvent; the nominal value is 27 L/min.
+    11.1 Coverage | L1138-1174 | 1,592w | Tighten the filter housing with a calibrated gauge; the nominal value is 617 kPa.
+    11.2 Exclusions | L1175-1204 | 1,529w | Calibrate the mounting bracket with a calibrated gauge; the nominal value is 579 mm.
+    11.3 Claims Procedure | L1205-1234 | 1,473w | Tighten the drive belt for leaks at the joints; the nominal value is 385 kPa.
+  12 Troubleshooting | L1235-1370 | 6,029w | Tighten the coolant loop with the unit isolated.
+    12.1 Engine Will Not Start | L1237-1273 | 1,493w | Inspect the intake manifold with a calibrated gauge; the nominal value is 34 L/min.
+    12.2 Overheating | L1274-1310 | 1,584w | Inspect the drive belt to the specified torque; the nominal value is 91 L/min.
+    12.3 Low Oil Pressure | L1311-1340 | 1,489w | Replace the bearing set before each shift.
+    12.4 Excessive Vibration | L1341-1370 | 1,419w | Use only parts listed in the illustrated parts catalog.
+  S57 Appendix A Tools and Consumables | L1371-1377 | 375w | Do not reuse gaskets or self-locking nuts.
+  S58 Appendix B Parts List | L1378-1390 | 343w | Order parts through an Authorized Dealer.
+Tables and figures:
+  T1 L9: Table 1. Wear limits for scope (6 rows)
+  T2 L39: Table 2. Wear limits for safety conventions (6 rows)
+  T3 L73: Table 3. Reference values for definitions (6 rows)
+  T4 L103: Table 4. Reference values for related documents (6 rows)
+  T5 L135: Table 5. Wear limits for overview (6 rows)
+  T6 L161: Table 6. Inspection limits for major assemblies (6 rows)
+  T7 L191: Table 7. Inspection limits for operating principles (6 rows)
+  T8 L202: Table 8. Service checks for operating principles (6 rows)
+  T9 L230: Table 9. Inspection limits for site requirements (6 rows)
+  T10 L260: Table 10. Inspection limits for foundation and mounting (6 rows)
+  T11 L290: Table 11. Reference values for electrical connections (6 rows)
+  T12 L301: Table 12. Reference values for electrical connections (6 rows)
+  T13 L327: Table 13. Service checks for commissioning (6 rows)
+  T14 L382: Table 14. Reference values for starting procedure (6 rows)
+  T15 L412: Table 15. Reference values for normal operation (6 rows)
+  T16 L423: Table 16. Service checks for normal operation (6 rows)
+  T17 L449: Table 17. Wear limits for shutdown (6 rows)
+  T18 L481: Table 18. Inspection limits for daily checks (6 rows)
+  … 34 more; find "Table" lists them.
+Defined terms: Service Interval (L66), Authorized Dealer (L66)

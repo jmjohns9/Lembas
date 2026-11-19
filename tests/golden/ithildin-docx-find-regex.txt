@@ -1,0 +1,8 @@
+[ithildin find: 'torque\\s+values?': 126 hits in 43 sections (1.1, 1.3, 1.4, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, …)]
+== 'torque\\s+values?' (126 hits)
+>L23 §1.1 | Record the bearing set with the unit isolated; the nominal value is 150 N·m. Verify the filter housing for leaks at the joints; the nominal value is 693 mm. Torque values apply to clean, lightly oiled threads. Measure the hydraulic line to 
+>L26 §1.1 | Replace the pump assembly for wear and scoring; the nominal value is 527 L/min. Calibrate the gearbox after the first 50 hours. Torque values apply to clean, lightly oiled threads. Calibrate the fuel rail to the specified torque. Clean the 
+>L29 §1.1 | Replace the bearing set and log the reading in the maintenance record. Torque values apply to clean, lightly oiled threads. Calibrate the drive belt with a calibrated gauge. Inspect the fuel rail and log the reading in the maintenance recor
+>L33 §1.1 | Verify the control panel after the first 50 hours. Replace the sensor harness with the unit isolated; the nominal value is 409 L/min. Torque values apply to clean, lightly oiled threads. Inspect the sensor harness against the reference valu
+>L79 §1.3 | Check the fuel rail after the first 50 hours. Lubricate the filter housing with the unit isolated; the nominal value is 727 kPa. Clean the exhaust bypass to the specified torque. Replace the fuel rail to the specified torque. Torque values 
+  … 121 more; narrow the pattern or raise -n.

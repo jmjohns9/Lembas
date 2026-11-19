@@ -208,7 +208,7 @@ def svg(w: float, h: float, body: str, title: str | None = None, vb: str | None 
 def write(path: str, content: str) -> str:
     full = os.path.join(BRAND, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
-    with open(full, "w") as f:
+    with open(full, "w", encoding="utf-8") as f:
         f.write(content)
     return full
 

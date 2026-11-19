@@ -1,0 +1,13 @@
+[ithildin find: 'coolant outlet': 1 hits in 1 sections (7.3); 'altitude': 1 hits in 1 sections (11.2); 'OF-7731': 1 hits in 1 sections (S58)]
+== 'coolant outlet' (1 hits)
+ L768 §7.3 | Calibrate the exhaust bypass to the specified torque; the nominal value is 611 mm. Clean the controller after the first 50 hours. Calibrate the drive belt using the approved solvent; the nominal value is 800 mm. Calibrate the sensor harness
+>L769 §7.3 | Clean the coolant loop and log the reading in the maintenance record. Inspect the relief valve with the unit isolated. Clean the bearing set for leaks at the joints; the nominal value is 804 kPa. Tighten the relief valve with a calibrated g
+ L770 §7.3 | Allow sealant to cure for at least four hours before startup. Replace the controller after the first 50 hours. Readings outside tolerance must be reported to the site supervisor. Tighten the intake manifold against the reference values. Ins
+== 'altitude' (1 hits)
+ L1178 §11.2 | Clean the controller before each shift. Record the controller before each shift; the nominal value is 83 L/min. Check the control panel and log the reading in the maintenance record. Tighten the relief valve and log the reading in the maint
+>L1179 §11.2 | Measure the coolant loop with a calibrated gauge. Record the coolant loop to the specified torque; the nominal value is 492 L/min. Clean the control panel for leaks at the joints. Check the bearing set after the first 50 hours. Wear eye pro
+ L1180 §11.2 | Clean the gearbox with the unit isolated; the nominal value is 605 kPa. Measure the filter housing before each shift. Clean the pump assembly after the first 50 hours. Torque values apply to clean, lightly oiled threads. Calibrate the hydra
+== 'OF-7731' (1 hits)
+ L1382 §S58 | | Air filter element | AF-2210-C | 1 |
+>L1383 §S58 | | Oil filter | OF-7731-B | 1 |
+ L1384 §S58 | | Fuel filter | FF-4402-A | 2 |

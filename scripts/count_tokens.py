@@ -9,6 +9,7 @@ percentages. Pass --tiktoken to use the cl100k_base tokenizer if installed.
 """
 import argparse
 import pathlib
+import sys
 
 
 def make_counter(use_tiktoken):
@@ -16,7 +17,14 @@ def make_counter(use_tiktoken):
         import tiktoken
         enc = tiktoken.get_encoding("cl100k_base")
         return lambda text: len(enc.encode(text))
+    # 4 characters per token suits English prose and is only used to compare two replies, so the error
+    # cancels out. squeeze.py (3) and ithildin.py (3.5) estimate denser text. CJK text is undercounted.
     return lambda text: round(len(text) / 4)
+
+
+def cut(base, lembas):
+    """How much shorter the lembas reply is, as a percentage. An empty baseline has nothing to cut."""
+    return f"{100 * (1 - lembas / base):6.1f}%" if base else f"{'n/a':>7}"
 
 
 def main():
@@ -26,15 +34,30 @@ def main():
     args = parser.parse_args()
     count = make_counter(args.tiktoken)
 
+    root = pathlib.Path(args.results_dir)
+    folders = sorted(p for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
+    if not folders:
+        print(f"count_tokens: no eval folders in {root}", file=sys.stderr)
+        sys.exit(1)
+
     total_base = total_lembas = 0
+    missing = []
     print(f"{'eval':32} {'baseline':>8} {'lembas':>7} {'cut':>7}")
-    for folder in sorted(p for p in pathlib.Path(args.results_dir).iterdir() if p.is_dir()):
-        base = count((folder / "baseline.md").read_text())
-        lembas = count((folder / "lembas.md").read_text())
+    for folder in folders:
+        files = [folder / "baseline.md", folder / "lembas.md"]
+        gone = [f for f in files if not f.is_file()]
+        if gone:
+            missing += gone
+            continue
+        base, lembas = (count(f.read_text(encoding="utf-8")) for f in files)
         total_base += base
         total_lembas += lembas
-        print(f"{folder.name:32} {base:8} {lembas:7} {100 * (1 - lembas / base):6.1f}%")
-    print(f"{'TOTAL':32} {total_base:8} {total_lembas:7} {100 * (1 - total_lembas / total_base):6.1f}%")
+        print(f"{folder.name:32} {base:8} {lembas:7} {cut(base, lembas)}")
+    print(f"{'TOTAL':32} {total_base:8} {total_lembas:7} {cut(total_base, total_lembas)}")
+    if missing:
+        print("count_tokens: missing reply files, left out of the totals:\n  " +
+              "\n  ".join(str(f.relative_to(root)) for f in missing), file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

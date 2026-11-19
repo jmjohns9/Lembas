@@ -9,7 +9,7 @@ for f in files:
     rel = os.path.relpath(f, BRAND)
     name = os.path.basename(f)[:-4]
     render(rel, f"previews/logo/{name}.png", 600 if "construction" not in name and "pair" not in name else 1600)
-    src = open(f).read()
+    src = open(f, encoding="utf-8").read()
     w = float(re.search(r'width="([\d.]+)"', src).group(1)); h = float(re.search(r'height="([\d.]+)"', src).group(1))
     if "construction" in name or "pair" in name:
         continue

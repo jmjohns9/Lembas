@@ -1,0 +1,19 @@
+[lembas squeeze: csv, 2,000 rows × 7 columns. ~31,220 tokens shown as a summary. Full original: mid-sales.csv ; compute exact sums, counts and filters on the original (pandas, csvkit, awk). Lines marked L123 are original line numbers.]
+columns (7), 2,000 data rows:
+  date (date): 2026-01-01 … 2026-03-25, 84 distinct
+  region (text): "West"×511, "East"×509, "South"×498, "North"×482
+  rep (text, 3 null): 20 distinct; top "W-rep-3"×120, "E-rep-5"×113, "S-rep-2"×110, "S-rep-4"×109
+  product (text): "Team"×524, "Enterprise"×510, "Pro"×498, "Starter"×468
+  units (int): min 1, max 40, mean 20.676, median 21, sum 41,352
+  unit_price (float): 19.99×522, 49.0×510, 349.0×509, 129.5×459; min 19.99, max 349, mean 136.25, median 49, sum 272,506.28
+  revenue (float): min 19.99, max 13,960, mean 2,831.94, median 1,274, sum 5,663,877.62
+first rows:
+L1 date,region,rep,product,units,unit_price,revenue
+L2 2026-01-01,North,N-rep-1,Pro,38,19.99,759.62
+L3 2026-01-01,East,E-rep-5,Team,33,19.99,659.67
+L4 2026-01-01,West,W-rep-4,Pro,39,349.0,13611.0
+L5 2026-01-01,East,E-rep-5,Enterprise,30,129.5,3885.0
+L6 2026-01-01,West,W-rep-2,Team,29,49.0,1421.0
+  … 1,993 rows not shown
+L2000 2026-03-25,East,E-rep-4,Starter,12,49.0,588.0
+L2001 2026-03-25,South,S-rep-2,Team,32,129.5,4144.0

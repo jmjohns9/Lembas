@@ -65,7 +65,7 @@ Every tool call re-sends the whole conversation, so anything read stays in conte
 
 1. Size it first: `wc -l`, `ls -lh`, `jq 'length'`, `head -5`.
 2. Ask the narrow question with a tool: `grep -n -m 20 -i error`, `jq '.items[] | select(.status >= 400)'`, or a few lines of pandas. Put related queries in one command; one call with three greps costs less than three calls.
-3. For output you can't narrow in advance (a test suite, a build, an install, an API call), or when you need the whole picture, run it through the bundled compressor: `<command> 2>&1 | python3 scripts/squeeze.py` or `python3 scripts/squeeze.py <file>`. It keeps every error, warning and stack trace, collapses repeated lines, profiles CSV columns and summarizes JSON structure. It saves the original and prints its path.
+3. For output you can't narrow in advance (a test suite, a build, an install, an API call), or when you need the whole picture, run it through the bundled compressor: `<command> 2>&1 | python3 scripts/squeeze.py` or `python3 scripts/squeeze.py <file>`. It shows each distinct error, warning and stack trace (or says how many more there are), collapses repeated lines, profiles CSV columns and summarizes JSON structure. It saves the original and prints its path.
 4. For exact counts, sums or specific rows, compute them on the original file. Never estimate from a summary.
 
 Don't re-read files already in context. Read code in full when you will edit it; squeeze only logs and data.

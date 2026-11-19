@@ -2,7 +2,7 @@
 import re
 
 from lib import BRAND, C, PALETTE, Leaf, contrast, n, write
-from logo import ithildin_body, lembas_body
+from logo import ithildin_body
 
 LIGHT_PAIRS = [("ink", "waybread"), ("moss", "waybread"), ("gilt", "waybread"), ("lorien-green", "waybread"),
                ("starlight", "waybread"), ("ink", "waybread-deep"), ("gilt", "waybread-deep")]
@@ -14,7 +14,7 @@ NEVER_PAIRS = [("mallorn-gold", "waybread"), ("silver-bark", "waybread"), ("lori
 
 
 def dims(rel):
-    s = open(f"{BRAND}/{rel}").read()
+    s = open(f"{BRAND}/{rel}", encoding="utf-8").read()
     return float(re.search(r'width="([\d.]+)"', s).group(1)), float(re.search(r'height="([\d.]+)"', s).group(1))
 
 
@@ -57,7 +57,7 @@ def swatches():
 
 
 def misuse():
-    g, night = C["mallorn-gold"], C["anduin-night"]
+    g = C["mallorn-gold"]
     leaf = Leaf()
     halves = leaf.halves()
     cases = [

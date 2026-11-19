@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Tests for ithildin.py. Run: python3 tests/test_ithildin.py
 
-Builds a 126-page maintenance manual in four formats with planted facts (tests/ithildin_fixtures.py)
-and checks that map, find, read and table locate each fact in the right section, with exact text.
-Needs reportlab and python-docx to build the fixtures; tests that need them are skipped otherwise.
+Builds a maintenance manual of over 100 pages in four formats with planted facts
+(tests/ithildin_fixtures.py) and checks that map, find, read and table locate each fact in the right
+section, with exact text. Needs reportlab and python-docx to build the fixtures; tests that need them
+are skipped otherwise.
+
+The PDF's page count and line breaks depend on the fonts installed (126 pages with DejaVu on Linux,
+115 with Helvetica elsewhere), so no test may hard-code a page number or a per-line hit count.
+Expected pages are taken from the map and checked against what read and find report.
 """
 import contextlib
 import io
@@ -106,7 +111,12 @@ class Retrieval(unittest.TestCase):
 
     def test_find_batches_patterns_and_reports_counts(self):
         out = run("find", path("manual.pdf"), "coolant outlet", "altitude", "OF-7731")
-        self.assertRegex(out.splitlines()[0], r"'coolant outlet': 1 hits.*'altitude': 1 hits.*'OF-7731': 1 hits")
+        # "altitude" occurs twice in one planted sentence. Hits are counted per line, so it is one hit
+        # when the sentence fits on a line and two when it wraps.
+        self.assertRegex(out.splitlines()[0],
+                         r"'coolant outlet': 1 hits in 1 sections \(7\.3\); "
+                         r"'altitude': [12] hits in 1 sections \(11\.2\); "
+                         r"'OF-7731': 1 hits in 1 sections")
 
     def test_find_matches_phrases_wrapped_across_lines(self):
         doc = ithildin.load(path("manual.pdf"))
@@ -116,15 +126,27 @@ class Retrieval(unittest.TestCase):
         self.assertGreater(found, plain)
 
     def test_read_section_returns_exact_text_with_pages(self):
+        pages = re.search(r"(?m)^\s*7\.3 Operating Limits \| p(\d+)-(\d+) \|",
+                          run("map", path("manual.pdf"), "--budget", "9000"))
+        self.assertTrue(pages, "the map should give section 7.3 a page range")
+        first, last = int(pages.group(1)), int(pages.group(2))
         out = run("read", path("manual.pdf"), "7.3")
-        self.assertTrue(out.startswith("[ithildin read: 7.3 Operating Limits, p71-73]"), out[:80])
-        self.assertIn("[p72]", out)
-        flat = re.sub(r"\s+", " ", out)
+        self.assertTrue(out.startswith(f"[ithildin read: 7.3 Operating Limits, p{first}-{last}]"), out[:80])
+        for page in range(first, last + 1):
+            self.assertIn(f"[p{page}]", out)
+        self.assertNotIn(f"[p{last + 1}]", out)
+        # A page break can fall inside the planted sentence, so drop the page markers before matching.
+        flat = re.sub(r"\s+", " ", re.sub(r"(?m)^\[p\d+\]$", "", out))
         self.assertIn("maximum coolant outlet temperature is 104 °C", flat)
         self.assertNotIn("7.4 Draining", out)
 
     def test_read_pages_and_lines(self):
-        self.assertIn("[p108]", run("read", path("manual.pdf"), "p108"))
+        doc = ithildin.load(path("manual.pdf"))
+        page = doc.lines[len(doc.lines) // 2][0]          # a page in the middle that has text
+        out = run("read", path("manual.pdf"), f"p{page}")
+        self.assertTrue(out.startswith(f"[ithildin read: page {page}, p{page}]"), out[:60])
+        self.assertIn(f"[p{page}]", out)
+        self.assertNotIn(f"[p{page + 1}]", out)
         out = run("read", path("manual.docx"), "L5-6")
         self.assertEqual(len(out.strip().splitlines()), 3)
 

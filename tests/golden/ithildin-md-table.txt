@@ -1,0 +1,6 @@
+[ithildin table T36 at L1008: Table 36. Torque values for engine fasteners, 5 rows]
+| Fastener | Size | Torque (N·m) | Sequence |
+| Cylinder head bolt | M12 | 85 | Spiral, 3 passes |
+| Rocker cover screw | M6 | 10 | Cross pattern |
+| Exhaust manifold nut | M10 | 48 | Center out |
+| Oil pan bolt | M8 | 24 | Cross pattern |

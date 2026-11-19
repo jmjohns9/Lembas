@@ -15,20 +15,25 @@ Standard library only; uses pdftotext, pypdf and pdfplumber when they are availa
 Nothing is sent anywhere.
 """
 import argparse
+import bisect
 import hashlib
 import html
 import html.parser
 import json
+import logging
+import math
 import os
+import posixpath
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import zipfile
 from xml.etree import ElementTree as ET
 
-VERSION = "1.0.0"
+VERSION = "1.0.0"   # this script's own version, printed by --version; not the Lembas release number
 DEFAULT_MAP_BUDGET = 2500
 DEFAULT_READ_TOKENS = 8000
 GIST_WORDS = 28
@@ -36,7 +41,8 @@ GIST_WORDS = 28
 
 def est_tokens(text):
     # About 3.5 characters per token: Claude's tokenizer splits code, numbers and symbols finely,
-    # so the usual 4 undercounts technical documents.
+    # so the usual 4 undercounts technical documents. squeeze.py uses 3 (logs and data) and
+    # scripts/count_tokens.py 4 (prose). All undercount Chinese, Japanese and Korean text.
     return (len(text) * 2 + 6) // 7
 
 
@@ -50,7 +56,7 @@ def clip_words(text, n):
 
 
 def norm(s):
-    return re.sub(r"\s+", " ", s).strip()
+    return " ".join(s.split())   # same as collapsing \s+ to one space and stripping, and much faster
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +73,7 @@ class Doc:
         self.tables = []       # dicts: line, caption, rows (optional, for DOCX/PPTX)
         self.outline_source = "none"
         self.notes = []
+        self.terms = []        # dicts: term, line (defined terms, filled in by finish)
 
     def add(self, text, page=None):
         self.lines.append([page, text])
@@ -76,22 +83,53 @@ def _run(cmd, timeout=180):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
+def _pdf_reader(path):
+    """pypdf's reader for `path`. Raises ImportError when pypdf is not installed."""
+    from pypdf import PdfReader
+    # pypdf logs a warning for each oddity in a damaged file; printed, they would end up in Claude's context.
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    return PdfReader(path)
+
+
+def _reader_once(path):
+    """A function returning one shared pypdf reader for `path`, opened on first use. A PDF can need
+    it three times (text fallback, bookmarks, type sizes), and parsing the file is the slow part.
+    A failure is remembered too, so a damaged file is not parsed again only to fail again."""
+    opened = []
+
+    def get():
+        if not opened:
+            try:
+                opened.append(_pdf_reader(path))
+            except Exception as exc:
+                opened.append(exc)
+        if isinstance(opened[0], Exception):
+            raise opened[0]
+        return opened[0]
+    return get
+
+
 def extract_pdf(path):
     doc = Doc(path, "PDF")
+    reader = _reader_once(path)
     pages = None
     if shutil.which("pdftotext"):
-        r = _run(["pdftotext", "-enc", "UTF-8", path, "-"])
-        if r.returncode == 0:
+        try:
+            # An absolute path cannot be mistaken for an option, whatever the file is called.
+            r = _run(["pdftotext", "-enc", "UTF-8", os.path.abspath(path), "-"])
+        except (subprocess.TimeoutExpired, OSError):
+            r = None                    # fall back to pypdf, as for a failed run
+        if r is not None and r.returncode == 0:
             pages = r.stdout.split("\f")
             if pages and not pages[-1].strip():
                 pages = pages[:-1]
     if pages is None:
         try:
-            from pypdf import PdfReader
+            pages = [(p.extract_text() or "") for p in reader().pages]
         except ImportError:
             sys.exit("ithildin: reading PDF needs pdftotext (poppler-utils) or `pip install pypdf`.")
-        reader = PdfReader(path)
-        pages = [(p.extract_text() or "") for p in reader.pages]
+        except Exception as exc:
+            sys.exit(f"ithildin: {os.path.basename(path)} could not be read as a PDF ({exc.__class__.__name__}: {exc}).")
     doc.pages = len(pages)
     for i, text in enumerate(pages, 1):
         for line in text.splitlines():
@@ -102,24 +140,19 @@ def extract_pdf(path):
         doc.notes.append("Little or no text layer: this looks like a scanned PDF. OCR it first "
                          "(for example `ocrmypdf in.pdf out.pdf`) or read pages as images.")
     _strip_running_lines(doc)
-    _pdf_outline(doc)
+    _pdf_outline(doc, reader)
     if not doc.headings:
-        _pdf_font_headings(doc)
+        _pdf_font_headings(doc, reader=reader)
     return doc
 
 
-def _pdf_font_headings(doc, max_pages=2000):
+def _pdf_font_headings(doc, max_pages=2000, reader=None):
     """Headings from type size: lines set noticeably larger than the body text."""
     if doc.pages > max_pages:
         return
     try:
-        from pypdf import PdfReader
-        import math
-    except ImportError:
-        return
-    try:
-        reader = PdfReader(doc.path)
-    except Exception:
+        reader = reader() if reader else _pdf_reader(doc.path)
+    except Exception:      # pypdf is not installed, or the file is damaged
         return
     runs = []          # (page, size, text)
     sizes = {}
@@ -220,15 +253,11 @@ def _strip_running_lines(doc):
     doc.lines = [doc.lines[i] for i in keep]
 
 
-def _pdf_outline(doc):
+def _pdf_outline(doc, reader=None):
     try:
-        from pypdf import PdfReader
-    except ImportError:
-        return
-    try:
-        reader = PdfReader(doc.path)
+        reader = reader() if reader else _pdf_reader(doc.path)
         outline = reader.outline
-    except Exception:
+    except Exception:      # pypdf is not installed, or the file is damaged
         return
     found = []
 
@@ -268,7 +297,8 @@ def _pdf_outline(doc):
         num = m.group(1) if m and re.match(r"^\d", title) else ""
         doc.headings.append({"line": line_idx, "level": level, "num": num, "title": title})
     doc.headings.sort(key=lambda h: h["line"])
-    doc.outline_source = "PDF bookmarks"
+    if doc.headings:   # a scan has bookmarks but no text lines for them to point at
+        doc.outline_source = "PDF bookmarks"
 
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -287,6 +317,20 @@ def _docx_text(el):
     return "".join(out)
 
 
+# Word wraps content controls (form fields, template placeholders, generated contents lists) and
+# custom XML in these elements. Their contents are ordinary document text.
+_DOCX_WRAPPERS = (W + "sdt", W + "sdtContent", W + "customXml")
+
+
+def _docx_children(parent, tags):
+    """Direct children of `parent` with one of `tags`, in document order, looking inside wrappers."""
+    for child in parent:
+        if child.tag in tags:
+            yield child
+        elif child.tag in _DOCX_WRAPPERS:
+            yield from _docx_children(child, tags)
+
+
 def extract_docx(path):
     doc = Doc(path, "Word document")
     with zipfile.ZipFile(path) as z:
@@ -299,7 +343,7 @@ def extract_docx(path):
                 lvl = st.find(f"{W}pPr/{W}outlineLvl")
                 styles[sid] = ((name.get(W + "val") if name is not None else sid) or "",
                                int(lvl.get(W + "val")) + 1 if lvl is not None else None)
-    for child in body:
+    for child in _docx_children(body, (W + "p", W + "tbl")):
         if child.tag == W + "p":
             text = norm(_docx_text(child))
             if not text:
@@ -327,8 +371,8 @@ def extract_docx(path):
             doc.add(text)
         elif child.tag == W + "tbl":
             rows = []
-            for tr in child.iter(W + "tr"):
-                cells = [norm(_docx_text(tc)) for tc in tr.findall(W + "tc")]
+            for tr in _docx_children(child, (W + "tr",)):   # not .iter(): a nested table's rows are inside a cell
+                cells = [norm(_docx_text(tc)) for tc in _docx_children(tr, (W + "tc",))]
                 rows.append(cells)
             _add_table(doc, rows)
     if doc.headings:
@@ -352,13 +396,37 @@ def _add_table(doc, rows, page=None):
 
 
 P = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+PML = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+
+def _slide_order(z, names):
+    """Slide parts in the order the deck shows them.
+
+    PowerPoint records that order in ppt/presentation.xml and does not rename slide files when a
+    slide is moved, so the numbers in the file names only say when each slide was created.
+    Slides the list leaves out, and decks with no list, fall back to file-name order.
+    """
+    by_number = sorted(names, key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[1]).group(1)))
+    try:
+        rels = ET.fromstring(z.read("ppt/_rels/presentation.xml.rels"))
+        listed = ET.fromstring(z.read("ppt/presentation.xml")).iter(PML + "sldId")
+    except (KeyError, ET.ParseError):
+        return by_number
+    targets = {r.get("Id"): r.get("Target") or "" for r in rels}
+    ordered = []
+    for slide in listed:
+        target = targets.get(slide.get(REL_ID), "")
+        name = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join("ppt", target))
+        if name in names and name not in ordered:
+            ordered.append(name)
+    return ordered + [n for n in by_number if n not in ordered]
 
 
 def extract_pptx(path):
     doc = Doc(path, "PowerPoint deck")
     with zipfile.ZipFile(path) as z:
-        names = [n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)]
-        names.sort(key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[1]).group(1)))
+        names = _slide_order(z, [n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)])
         for i, name in enumerate(names, 1):
             root = ET.fromstring(z.read(name))
             title_done = False
@@ -378,28 +446,37 @@ def extract_pptx(path):
                         for tr in tbl.iter(P + "tr")]
                 _add_table(doc, rows, i)
         doc.pages = len(names)
-    doc.outline_source = "slide titles"
+    if doc.headings:
+        doc.outline_source = "slide titles"
     return doc
+
+
+MD_FENCE = re.compile(r"^\s*(```|~~~)")
+MD_TABLE_RULE = re.compile(r"^\s*\|?\s*:?-{2,}")
+# A closing run of #s counts only after a space, so "C#" keeps its #.
+MD_HEADING = re.compile(r"^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$")
+SECTION_NUMBER = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+")
 
 
 def extract_markdown(path, text=None, kind="Markdown"):
     doc = Doc(path, kind)
     if text is None:
-        with open(path, encoding="utf-8", errors="replace") as f:
+        # utf-8-sig drops a leading byte-order mark, which would otherwise hide a first-line heading.
+        with open(path, encoding="utf-8-sig", errors="replace") as f:
             text = f.read()
     fence = False
     pending = []          # rows of a Markdown table being read
 
     def flush_table():
         rows = [[norm(c) for c in r.strip().strip("|").split("|")] for r in pending
-                if not re.match(r"^\s*\|?\s*:?-{2,}", r)]
+                if not MD_TABLE_RULE.match(r)]
         pending.clear()
         if rows:
             _add_table(doc, rows)
 
     for raw in text.splitlines():
         line = raw.rstrip()
-        if re.match(r"^\s*(```|~~~)", line):
+        if MD_FENCE.match(line):
             fence = not fence
         if not fence and line.lstrip().startswith("|") and line.rstrip().endswith("|"):
             pending.append(line)
@@ -408,10 +485,10 @@ def extract_markdown(path, text=None, kind="Markdown"):
             flush_table()
         if not line.strip():
             continue
-        m = None if fence else re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
+        m = None if fence else MD_HEADING.match(line)
         if m:
             title = m.group(2).strip()
-            n = re.match(r"^(\d+(?:\.\d+)*)\.?\s+", title)
+            n = SECTION_NUMBER.match(title)
             doc.headings.append({"line": len(doc.lines), "level": len(m.group(1)),
                                  "num": n.group(1) if n else "", "title": title})
             doc.add(title)
@@ -425,6 +502,7 @@ def extract_markdown(path, text=None, kind="Markdown"):
 
 
 class _HTMLText(html.parser.HTMLParser):
+    SKIP = ("script", "style", "nav", "noscript", "title")   # <title> is the tab name, not page text
     BLOCK = {"p", "div", "li", "tr", "br", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "section",
              "article", "table", "blockquote", "dd", "dt"}
 
@@ -442,8 +520,11 @@ class _HTMLText(html.parser.HTMLParser):
         self.buf = []
 
     def handle_starttag(self, tag, attrs):
-        if tag in ("script", "style", "nav", "noscript"):
+        if tag in self.SKIP:
             self.skip += 1
+        if tag == "br" and self.head:
+            self.buf.append(" ")   # a break inside a heading is still one heading
+            return
         if tag in self.BLOCK:
             self.flush()
             self.head = int(tag[1]) if re.match(r"h[1-6]$", tag) else None
@@ -451,9 +532,9 @@ class _HTMLText(html.parser.HTMLParser):
             self.buf.append(" | ")
 
     def handle_endtag(self, tag):
-        if tag in ("script", "style", "nav", "noscript") and self.skip:
+        if tag in self.SKIP and self.skip:
             self.skip -= 1
-        if tag in self.BLOCK:
+        if tag in self.BLOCK and tag != "br":
             self.flush()
             self.head = None
 
@@ -463,7 +544,7 @@ class _HTMLText(html.parser.HTMLParser):
 
 
 def extract_html(path):
-    with open(path, encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
         p = _HTMLText()
         p.feed(f.read())
         p.flush()
@@ -471,7 +552,7 @@ def extract_html(path):
 
 
 def extract_with_pandoc(path):
-    r = _run(["pandoc", path, "-t", "gfm", "--wrap=none"])
+    r = _run(["pandoc", os.path.abspath(path), "-t", "gfm", "--wrap=none"])
     if r.returncode != 0:
         sys.exit(f"ithildin: pandoc could not read {path}: {r.stderr.strip()[:300]}")
     return extract_markdown(path, r.stdout, os.path.splitext(path)[1].lstrip(".").upper() + " document")
@@ -625,14 +706,56 @@ def _gist(text):
 # Loading with a cache
 # ---------------------------------------------------------------------------
 
+def _private_temp_dir(name):
+    """A folder for `name` under the system temp folder that only the current user can read.
+
+    The temp folder is shared, so another user could have made a folder of that name first and would
+    then be able to read everything written into it. Such a folder is not used: `name-<uid>` is tried
+    next, so later runs find the same folder, and a new private one is made only if that fails too."""
+    names = [name] + ([f"{name}-{os.getuid()}"] if hasattr(os, "getuid") else [])
+    for n in names:
+        d = os.path.join(tempfile.gettempdir(), n)
+        try:
+            os.makedirs(d, mode=0o700, exist_ok=True)
+        except OSError:   # a file of that name is in the way
+            continue
+        if hasattr(os, "getuid"):
+            st = os.lstat(d)
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                continue
+        try:
+            os.chmod(d, 0o700)
+        except OSError:
+            pass
+        return d
+    return tempfile.mkdtemp(prefix=name + "-")
+
+
 def cache_dir():
-    d = os.environ.get("ITHILDIN_CACHE") or os.path.join(tempfile.gettempdir(), "ithildin")
-    os.makedirs(d, mode=0o700, exist_ok=True)
+    """Where parsed documents are cached. They can hold confidential text, so the default folder is private.
+    A folder named in ITHILDIN_CACHE is the user's own choice and keeps its permissions."""
+    chosen = os.environ.get("ITHILDIN_CACHE")
+    if chosen:
+        os.makedirs(chosen, mode=0o700, exist_ok=True)
+        return chosen
+    return _private_temp_dir("ithildin")
+
+
+PANDOC_EXTS = (".rst", ".odt", ".epub", ".rtf", ".org", ".tex", ".adoc", ".textile")
+
+
+def _looks_binary(path):
+    """True when the start of the file holds NUL bytes, which text never does and binary formats nearly always do."""
+    with open(path, "rb") as f:
+        return b"\x00" in f.read(8192)
+
+
+def _office(extract, path, kind):
+    """Read a Word or PowerPoint file, or exit with a message if it is not really one."""
     try:
-        os.chmod(d, 0o700)   # parsed documents can hold confidential text
-    except OSError:
-        pass
-    return d
+        return extract(path)
+    except (zipfile.BadZipFile, KeyError, ET.ParseError, ValueError, TypeError, AttributeError) as exc:
+        sys.exit(f"ithildin: {os.path.basename(path)} is not a valid {kind} file ({exc.__class__.__name__}: {exc}).")
 
 
 def load(path):
@@ -644,6 +767,7 @@ def load(path):
             h.update(chunk)
     with open(os.path.abspath(__file__), "rb") as f:
         h.update(f.read())   # a new script version never reuses an old cache entry
+    h.update(os.path.splitext(path)[1].lower().encode())   # the extension picks the parser
     cpath = os.path.join(cache_dir(), h.hexdigest() + ".json")
     if os.path.exists(cpath):
         try:
@@ -659,25 +783,36 @@ def load(path):
     if ext == ".pdf":
         doc = extract_pdf(path)
     elif ext in (".docx", ".docm"):
-        doc = extract_docx(path)
+        doc = _office(extract_docx, path, "Word")
     elif ext == ".pptx":
-        doc = extract_pptx(path)
+        doc = _office(extract_pptx, path, "PowerPoint")
     elif ext in (".md", ".markdown", ".mdx"):
         doc = extract_markdown(path)
     elif ext in (".html", ".htm", ".xhtml"):
         doc = extract_html(path)
-    elif ext in (".txt", ".text", ".log", ""):
+    elif ext in (".txt", ".text", ".log"):
         doc = extract_text(path)
-    elif shutil.which("pandoc") and ext in (".rst", ".odt", ".epub", ".rtf", ".org", ".tex", ".adoc", ".textile"):
+    elif ext in PANDOC_EXTS and shutil.which("pandoc"):
         doc = extract_with_pandoc(path)
-    elif ext in (".doc", ".ppt", ".odp", ".rtf") and shutil.which("soffice"):
-        sys.exit(f"ithildin: convert first: soffice --headless --convert-to "
-                 f"{'docx' if ext in ('.doc', '.rtf') else 'pptx'} {path}")
+    elif ext in (".doc", ".ppt", ".odp", ".rtf"):
+        target = "docx" if ext in (".doc", ".rtf") else "pptx"
+        if shutil.which("soffice"):
+            sys.exit(f"ithildin: convert first: soffice --headless --convert-to {target} {path}")
+        sys.exit(f"ithildin: {ext} files cannot be read directly. Convert the file to {target} first, by saving it "
+                 f"as {target} from the application that made it or with LibreOffice "
+                 f"(soffice --headless --convert-to {target} FILE).")
+    elif ext in (".odt", ".epub"):
+        sys.exit(f"ithildin: reading {ext} files needs pandoc (https://pandoc.org), which is not installed. "
+                 "Install it, or convert the file to PDF, DOCX or Markdown.")
+    elif _looks_binary(path):
+        # Without this, a spreadsheet or an image would be mapped as if its bytes were the document.
+        sys.exit(f"ithildin: cannot read {os.path.basename(path)}: it is not a text file. Supported formats are "
+                 "PDF, DOCX, PPTX, Markdown, HTML and plain text, plus what pandoc converts when it is installed.")
     else:
-        doc = extract_text(path)
+        doc = extract_text(path)        # an unknown extension or none: plain text, or markup read as text
     finish(doc)
     try:
-        with open(cpath, "w") as f:
+        with os.fdopen(os.open(cpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             json.dump({k: v for k, v in doc.__dict__.items() if k != "path"}, f)
     except OSError:
         pass
@@ -697,11 +832,7 @@ def loc(doc, line_idx):
 
 def span(doc, start, end):
     a, b = loc(doc, start), loc(doc, max(start, end - 1))
-    if a == b:
-        return a
-    if a.startswith("p") and b.startswith("p"):
-        return f"{a}-{b[1:]}"
-    return f"{a}-{b[1:]}"
+    return a if a == b else f"{a}-{b[1:]}"
 
 
 def section_of(doc, line_idx):
@@ -712,6 +843,18 @@ def section_of(doc, line_idx):
         else:
             break
     return best
+
+
+def _section_finder(doc):
+    """section_of for many lines: a binary search instead of a scan of every heading per line."""
+    starts = [h["line"] for h in doc.headings]
+    if any(a > b for a, b in zip(starts, starts[1:])):   # every extractor sorts them, but be sure
+        return lambda i: section_of(doc, i)
+
+    def find(i):
+        k = bisect.bisect_right(starts, i)
+        return doc.headings[k - 1] if k else None
+    return find
 
 
 def render_map(doc, budget, depth=None):
@@ -737,7 +880,9 @@ def render_map(doc, budget, depth=None):
         return "\n".join(out)
 
     levels = sorted({h["level"] for h in doc.headings})
-    max_level = depth or levels[-1]
+    # --depth counts the levels this document uses, from its shallowest. A file whose top headings
+    # are "##" has no level 1, so comparing with the raw level would show nothing for --depth 1.
+    max_level = levels[min(depth, len(levels)) - 1] if depth and depth > 0 else levels[-1]
 
     def build(max_lvl, gist_lvl):
         rows = []
@@ -770,8 +915,9 @@ def render_map(doc, budget, depth=None):
             lines.append(txt)
         return lines
 
-    plans = [(max_level, max_level)] + [(lvl, g) for lvl in range(max_level, rel_min(levels) - 1, -1)
-                                        for g in range(lvl, rel_min(levels) - 2, -1)]
+    top = levels[0]
+    plans = [(max_level, max_level)] + [(lvl, g) for lvl in range(max_level, top - 1, -1)
+                                        for g in range(lvl, top - 2, -1)]
     body = None
     for max_lvl, gist_lvl in plans:
         body = build(max_lvl, gist_lvl)
@@ -779,7 +925,7 @@ def render_map(doc, budget, depth=None):
             break
     if est_tokens("\n".join(body)) > budget * 0.8:
         body = body[: max(10, int(len(body) * (budget * 0.8) / max(est_tokens("\n".join(body)), 1)))]
-        body.append(f"… outline cut to fit the budget; use --depth or find for the rest.")
+        body.append("… outline cut to fit the budget; use --depth or find for the rest.")
     out.extend(body)
     rest = budget - est_tokens("\n".join(out))
     if tables or figures:
@@ -797,15 +943,13 @@ def render_map(doc, budget, depth=None):
     return "\n".join(out)
 
 
-def rel_min(levels):
-    return min(levels)
-
-
 def _label(h):
     return h["title"] if h["title"].startswith(h["id"]) else f"{h['id']} {h['title']}"
 
 
 def resolve(doc, target):
+    if not doc.lines:
+        sys.exit("ithildin: this document has no text to read.")
     t = target.strip()
     m = re.match(r"^[pP](\d+)(?:\s*-\s*[pP]?(\d+))?$", t)
     if m:
@@ -819,7 +963,15 @@ def resolve(doc, target):
     m = re.match(r"^[lL](\d+)(?:\s*-\s*[lL]?(\d+))?$", t)
     if m:
         a, b = int(m.group(1)), int(m.group(2) or m.group(1))
-        return max(a - 1, 0), min(b, len(doc.lines)), f"lines {a}-{b}"
+        n = len(doc.lines)
+        # An impossible range used to print a header with nothing under it, which reads as "this part is empty".
+        if a < 1:
+            sys.exit("ithildin: lines are numbered from 1.")
+        if b < a:
+            sys.exit(f"ithildin: line range L{a}-{b} runs backwards; did you mean L{b}-{a}?")
+        if a > n:
+            sys.exit(f"ithildin: lines {a}-{b} are past the end; the document has {n} lines.")
+        return a - 1, min(b, n), f"lines {a}-{b}"
     for h in doc.headings:
         if h["id"].lower() == t.lower().lstrip("§"):
             return h["line"], h["end"], _label(h)
@@ -840,7 +992,7 @@ def resolve(doc, target):
 def render_read(doc, targets, max_tokens):
     out = []
     budget = max_tokens
-    for target in targets:
+    for position, target in enumerate(targets):
         a, b, label = resolve(doc, target)
         out.append(f"[ithildin read: {label}, {span(doc, a, b)}]")
         cur = None
@@ -858,6 +1010,9 @@ def render_read(doc, targets, max_tokens):
                 hint = f" Continue with: read FILE L{i + 1}-{b}"
                 if subs:
                     hint += " or by subsection: " + ", ".join(h["id"] for h in subs[:8])
+                unread = targets[position + 1:]
+                if unread:              # otherwise the reader cannot tell these were never reached
+                    hint += ". Not read yet: " + ", ".join(unread)
                 out.append(f"[truncated at {nxt} to stay under {max_tokens:,} tokens.{hint}]")
                 return "\n".join(out)
             out.append(text)
@@ -868,9 +1023,15 @@ def render_read(doc, targets, max_tokens):
 
 def render_find(doc, patterns, regex, limit, context):
     flags = re.I
-    compiled = [(p, re.compile(p if regex else re.escape(p), flags)) for p in patterns]
+    compiled = []
+    for p in patterns:
+        try:
+            compiled.append((p, re.compile(p if regex else re.escape(p), flags)))
+        except re.error as exc:
+            sys.exit(f"ithildin: invalid regular expression {p!r}: {exc}. Drop --regex to search for it as plain text.")
     out = []
     summary = []
+    section_at = _section_finder(doc)
     for label, rx in compiled:
         hits = []
         for i, (_, t) in enumerate(doc.lines):
@@ -881,7 +1042,7 @@ def render_find(doc, patterns, regex, limit, context):
                     hits.append(i)   # the phrase wraps onto the next line
         secs = []
         for i in hits:
-            s = section_of(doc, i)
+            s = section_at(i)
             sid = s["id"] if s else "-"
             if sid not in secs:
                 secs.append(sid)
@@ -889,15 +1050,16 @@ def render_find(doc, patterns, regex, limit, context):
                        (f" ({', '.join(secs[:12])}{', …' if len(secs) > 12 else ''})" if secs and secs != ['-'] else ""))
         out.append(f"== {label!r} ({len(hits)} hits)")
         shown = set()
+        listed = set(hits[:limit])   # a hit already printed as context for the one before it is still a hit
         for i in hits[:limit]:
-            s = section_of(doc, i)
+            s = section_at(i)
             sid = f"§{s['id']}" if s else ""
             lo, hi = max(0, i - context), min(len(doc.lines), i + context + 1)
             for j in range(lo, hi):
                 if j in shown:
                     continue
                 shown.add(j)
-                mark = ">" if j == i else " "
+                mark = ">" if j in listed else " "
                 out.append(f"{mark}{loc(doc, j)} {sid} | {doc.lines[j][1][:240]}")
         if len(hits) > limit:
             out.append(f"  … {len(hits) - limit} more; narrow the pattern or raise -n.")
@@ -921,6 +1083,10 @@ def render_table(doc, tid):
     if not match:
         sys.exit(f"ithildin: no table {tid!r}. Tables: " + ", ".join(t["id"] for t in doc.tables[:40]))
     t = match[0]
+    if t.get("figure"):
+        where = f"p{t['page']}" if t.get("page") else loc(doc, t["line"])
+        sys.exit(f"ithildin: {t['id']} is a figure ({t['caption']}), which has no rows. "
+                 f"Use read {where} for the text around it.")
     if t.get("rows"):
         rows = t["rows"]
         head = f"[ithildin table {t['id']} at {loc(doc, t['line'])}: {t['caption'] or 'no caption'}, {len(rows)} rows]"
@@ -955,11 +1121,40 @@ def render_table(doc, tid):
                 rows = [[norm(c or "") for c in r] for r in tb]
                 head = f"[ithildin table {t['id']} ({t['caption']}), extracted from p{pn}, {len(rows)} rows]"
                 return head + "\n" + "\n".join("| " + " | ".join(r) + " |" for r in rows)
-        a, b, _ = resolve(doc, f"p{t['page']}")
+        # A caption at the foot of a page is often followed by its table on the next page.
+        last = t["page"] + 1 if t["page"] < (doc.pages or 0) else t["page"]
+        a, b, _ = resolve(doc, f"p{t['page']}-{last}" if last > t["page"] else f"p{t['page']}")
         start = t["line"]
         return (f"[ithildin table {t['id']}: no table grid detected; text after the caption follows]\n" +
                 "\n".join(x for _, x in doc.lines[start:min(b, start + 60)]))
     sys.exit("ithildin: no rows stored for this table.")
+
+
+def _env_int(name, default):
+    """A whole-number setting from the environment; a bad value is reported and the default used."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        sys.stderr.write(f"ithildin: {name}={raw!r} is not a whole number; using {default}.\n")
+        return default
+
+
+def _write(stream, text):
+    """Write text as UTF-8, whatever encoding the terminal reports.
+
+    The reader is Claude, which expects UTF-8. Python would otherwise use the system code page on
+    Windows and fail on, or mis-encode, any character in the document that lies outside it.
+    """
+    raw = getattr(stream, "buffer", None)
+    if raw is None:                     # a text-only stream, such as io.StringIO in tests
+        stream.write(text)
+        return
+    stream.flush()
+    raw.write(text.encode("utf-8", "replace"))
+    raw.flush()
 
 
 def main(argv=None):
@@ -967,7 +1162,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     m = sub.add_parser("map", help="outline, page ranges, gists, tables, terms")
     m.add_argument("file")
-    m.add_argument("--budget", type=int, default=int(os.environ.get("ITHILDIN_MAP_BUDGET", DEFAULT_MAP_BUDGET)))
+    m.add_argument("--budget", type=int, default=_env_int("ITHILDIN_MAP_BUDGET", DEFAULT_MAP_BUDGET))
     m.add_argument("--depth", type=int)
     f = sub.add_parser("find", help="search; several patterns in one call")
     f.add_argument("file")
@@ -985,17 +1180,18 @@ def main(argv=None):
     sub.add_parser("version")
     args = ap.parse_args(argv)
     if args.cmd == "version":
-        print(VERSION)
+        _write(sys.stdout, VERSION + "\n")
         return
     doc = load(args.file)
     if args.cmd == "map":
-        print(render_map(doc, args.budget, args.depth))
+        view = render_map(doc, args.budget, args.depth)
     elif args.cmd == "find":
-        print(render_find(doc, args.patterns, args.regex, args.n, args.C))
+        view = render_find(doc, args.patterns, args.regex, args.n, args.C)
     elif args.cmd == "read":
-        print(render_read(doc, args.targets, args.max_tokens))
-    elif args.cmd == "table":
-        print(render_table(doc, args.table_id))
+        view = render_read(doc, args.targets, args.max_tokens)
+    else:
+        view = render_table(doc, args.table_id)
+    _write(sys.stdout, view + "\n")
 
 
 if __name__ == "__main__":

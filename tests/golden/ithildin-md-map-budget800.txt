@@ -1,0 +1,26 @@
+[ithildin map: manual.md (Markdown, 64,925 words, ~108,858 tokens). 58 sections, 52 tables, 0 figures. Outline from Markdown headings. Read parts: ithildin.py read FILE <id|p12-14|L40-90>. Search: ithildin.py find FILE "term" "other term".]
+S1 ACME X-200 Maintenance Manual | L1-1390 | 64,925w
+  1 General Information | L2-123 | 5,853w | 4 subsections | Record the filter housing for wear and scoring; the nominal value is 558 kPa.
+  2 Product Description | L124-222 | 4,511w | 3 subsections | Measure the hydraulic line to the specified torque.
+  3 Installation | L223-351 | 5,861w | 4 subsections | Measure the bearing set against the reference values.
+  4 Operation | L352-473 | 5,897w | 4 subsections | Use only parts listed in the illustrated parts catalog.
+  5 Scheduled Maintenance | L474-602 | 6,110w | 4 subsections | Measure the fuel rail using the approved solvent.
+  6 Lubrication System | L603-687 | 4,363w | 3 subsections | Measure the filter housing after the first 50 hours; the nominal value is 870 mm.
+  7 Cooling System | L688-816 | 6,012w | 4 subsections | Inspect the drive belt before each shift.
+  8 Fuel System | L817-901 | 4,363w | 3 subsections | Replace the control panel before each shift; the nominal value is 397 V.
+  9 Engine Mechanical | L902-1029 | 5,999w | 4 subsections | Calibrate the coolant loop with the unit isolated; the nominal value is 389 N·m.
+  10 Electrical System | L1030-1135 | 4,562w | 3 subsections | Clean the sensor harness to the specified torque; the nominal value is 662 kPa.
+  11 Warranty | L1136-1234 | 4,643w | 3 subsections | Verify the pump assembly using the approved solvent; the nominal value is 27 L/min.
+  12 Troubleshooting | L1235-1370 | 6,029w | 4 subsections | Tighten the coolant loop with the unit isolated.
+  S57 Appendix A Tools and Consumables | L1371-1377 | 375w | Do not reuse gaskets or self-locking nuts.
+  S58 Appendix B Parts List | L1378-1390 | 343w | Order parts through an Authorized Dealer.
+Tables and figures:
+  T1 L9: Table 1. Wear limits for scope (6 rows)
+  T2 L39: Table 2. Wear limits for safety conventions (6 rows)
+  T3 L73: Table 3. Reference values for definitions (6 rows)
+  T4 L103: Table 4. Reference values for related documents (6 rows)
+  T5 L135: Table 5. Wear limits for overview (6 rows)
+  T6 L161: Table 6. Inspection limits for major assemblies (6 rows)
+  T7 L191: Table 7. Inspection limits for operating principles (6 rows)
+  … 45 more; find "Table" lists them.
+Defined terms: Service Interval (L66), Authorized Dealer (L66)
