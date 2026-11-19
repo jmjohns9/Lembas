@@ -16,7 +16,8 @@ Guarantees:
       counted), or, past the budget, the summary says how many more there are and how to list them.
     * Line numbers (L123) refer to the original, so you can grep or sed it for anything not shown.
     * The original is never modified. Piped input is saved to $LEMBAS_SQUEEZE_DIR (default
-      $TMPDIR/lembas-squeeze, readable by you only) and the summary prints its path.
+      $TMPDIR/lembas-squeeze, readable by you only) and the summary prints its path. Saved copies are
+      deleted after $LEMBAS_SQUEEZE_KEEP_HOURS hours (default 24); 0 saves nothing.
     * Source code, diffs and plain prose pass through unchanged in auto mode.
     * If squeezing fails or saves less than 30%, the input is printed unchanged.
 
@@ -31,6 +32,7 @@ import os
 import re
 import stat
 import sys
+import time
 from collections import Counter
 from functools import lru_cache
 
@@ -38,6 +40,8 @@ VERSION = "1.0.0"   # this script's own version, printed by --version; not the L
 DEFAULT_THRESHOLD = 2000
 DEFAULT_BUDGET = 1500
 MIN_SAVING = 0.30
+DEFAULT_KEEP_HOURS = 24          # how long a saved original is kept; LEMBAS_SQUEEZE_KEEP_HOURS
+SAVED_NAME = re.compile(r"[0-9a-f]{12}\.(?:log|json|jsonl|csv|txt)")   # the names _cache_path gives
 MAX_LINE = 300
 
 CODE_EXTS = {
@@ -848,14 +852,54 @@ def _cache_path(text, kind, cache_dir=None):
     return os.path.join(cache_dir, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest()[:12] + ext)
 
 
+def keep_hours():
+    """How many hours a saved original is kept (LEMBAS_SQUEEZE_KEEP_HOURS). 0 means nothing is saved."""
+    raw = os.environ.get("LEMBAS_SQUEEZE_KEEP_HOURS", "").strip()
+    if not raw:
+        return DEFAULT_KEEP_HOURS
+    try:
+        hours = float(raw)
+        if hours >= 0:
+            return hours
+    except ValueError:
+        pass
+    _write(sys.stderr, f"squeeze: LEMBAS_SQUEEZE_KEEP_HOURS={raw!r} is not a number of hours; "
+                       f"using {DEFAULT_KEEP_HOURS}\n")
+    return DEFAULT_KEEP_HOURS
+
+
+def _prune(folder, hours):
+    """Delete saved originals in `folder` older than `hours`. Only files with the names squeeze gives are
+    touched, so a LEMBAS_SQUEEZE_DIR shared with other files is safe."""
+    cutoff = time.time() - hours * 3600
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if not SAVED_NAME.fullmatch(name):
+            continue
+        p = os.path.join(folder, name)
+        try:
+            st = os.lstat(p)
+            if stat.S_ISREG(st.st_mode) and st.st_mtime < cutoff:
+                os.remove(p)
+        except OSError:
+            pass
+
+
 def _store(text, path):
-    """Write `text` to `path` unless it is already there. Returns the path."""
-    # Command output can contain secrets, so the cache is readable by the current user only.
+    """Write `text` to `path` unless it is already there, then delete originals past their time. Returns the path."""
+    # Command output can contain secrets, so the cache is readable by the current user only, and each
+    # copy is deleted after keep_hours(). Saving the same output again restarts its clock.
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-    if not os.path.exists(path):
+    if os.path.exists(path):
+        os.utime(path)
+    else:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
+    _prune(os.path.dirname(path), keep_hours())
     return path
 
 
@@ -915,15 +959,19 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
         except Exception:
             return None, info
     def with_header(path):
+        if path is None:
+            where = "Full original: not kept (LEMBAS_SQUEEZE_KEEP_HOURS=0); re-run the command and narrow it with grep or sed"
+        else:
+            where = f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}"
         return (f"[lembas squeeze: {kind}, {facts}. ~{before:,} tokens shown as a summary. "
-                f"Full original: {path} ; {HINTS.get(kind, HINTS['text'])}. Lines marked L123 are original line numbers.]"
+                f"{where}. Lines marked L123 are original line numbers.]"
                 "\n" + body)
 
     # Decide whether the summary is worth using before anything is written: output that is passed
     # through needs no saved copy, and command output can hold secrets.
     # A summary must point at the full text. With nowhere to keep it, pass the input through.
     try:
-        path = original_path or _cache_path(text, kind)
+        path = original_path or (_cache_path(text, kind) if keep_hours() > 0 else None)
     except OSError as exc:
         info["error"] = f"could not save the original: {exc!r}"
         return None, info
@@ -931,13 +979,14 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
     info.update(kind=kind, after=est_tokens(view))
     if info["after"] > before * (1 - MIN_SAVING):
         return None, info
-    if not original_path:
+    if path and not original_path:
         try:
             _store(text, path)
         except OSError as exc:
             info["error"] = f"could not save the original: {exc!r}"
             return None, info
-    info["path"] = path
+    if path:
+        info["path"] = path
     return view, info
 
 

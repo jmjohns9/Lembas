@@ -503,7 +503,7 @@ class Load(unittest.TestCase):
         with mock.patch.object(ithildin.shutil, "which", lambda name: "/usr/bin/pandoc" if name == "pandoc" else None), \
                 mock.patch.object(ithildin, "_run", return_value=result) as run:
             doc = ithildin.load(path)
-        self.assertEqual(run.call_args[0][0], ["pandoc", path, "-t", "gfm", "--wrap=none"])
+        self.assertEqual(run.call_args[0][0], ["pandoc", "--sandbox", path, "-t", "gfm", "--wrap=none"])
         self.assertEqual((doc.kind, doc.headings[0]["title"]), ("RST document", "Title"))
         self.assertIn("Body from pandoc.", [t for _, t in doc.lines])
 
