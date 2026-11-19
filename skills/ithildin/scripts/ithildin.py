@@ -93,12 +93,18 @@ def _pdf_reader(path):
 
 def _reader_once(path):
     """A function returning one shared pypdf reader for `path`, opened on first use. A PDF can need
-    it three times (text fallback, bookmarks, type sizes), and parsing the file is the slow part."""
+    it three times (text fallback, bookmarks, type sizes), and parsing the file is the slow part.
+    A failure is remembered too, so a damaged file is not parsed again only to fail again."""
     opened = []
 
     def get():
         if not opened:
-            opened.append(_pdf_reader(path))
+            try:
+                opened.append(_pdf_reader(path))
+            except Exception as exc:
+                opened.append(exc)
+        if isinstance(opened[0], Exception):
+            raise opened[0]
         return opened[0]
     return get
 
@@ -704,18 +710,25 @@ def _private_temp_dir(name):
     """A folder for `name` under the system temp folder that only the current user can read.
 
     The temp folder is shared, so another user could have made a folder of that name first and would
-    then be able to read everything written into it. Such a folder is not used: a new private one is."""
-    d = os.path.join(tempfile.gettempdir(), name)
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    if hasattr(os, "getuid"):
-        st = os.lstat(d)
-        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
-            return tempfile.mkdtemp(prefix=name + "-")
-    try:
-        os.chmod(d, 0o700)
-    except OSError:
-        pass
-    return d
+    then be able to read everything written into it. Such a folder is not used: `name-<uid>` is tried
+    next, so later runs find the same folder, and a new private one is made only if that fails too."""
+    names = [name] + ([f"{name}-{os.getuid()}"] if hasattr(os, "getuid") else [])
+    for n in names:
+        d = os.path.join(tempfile.gettempdir(), n)
+        try:
+            os.makedirs(d, mode=0o700, exist_ok=True)
+        except OSError:   # a file of that name is in the way
+            continue
+        if hasattr(os, "getuid"):
+            st = os.lstat(d)
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                continue
+        try:
+            os.chmod(d, 0o700)
+        except OSError:
+            pass
+        return d
+    return tempfile.mkdtemp(prefix=name + "-")
 
 
 def cache_dir():

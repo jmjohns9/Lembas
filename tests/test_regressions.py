@@ -282,6 +282,18 @@ class I28_NarrowingLooksAtCommandsNotArguments(unittest.TestCase):
                     "for f in *.log; do tail -1 $f; done", "true\nsed -n '1,5p' f"]:
             self.assertTrue(hook.NARROWING.search(cmd), cmd)
 
+    def test_commands_behind_tests_and_wrappers_with_arguments_count(self):
+        for cmd in ["if grep -q x f; then echo y; fi", "! grep x f", "{ grep a x; }", "timeout 10 grep foo x",
+                    "sudo -u app tail -n 100 log", "git -C repo grep foo", "ssh host tail -n 500 app.log",
+                    "docker exec web tail -n 300 app.log", "kubectl exec pod -- tail -n 50 app.log",
+                    "bash -c \"grep a x\"", "sh -c 'head -5 f'", "while read l; do echo $l; done < f | sort"]:
+            self.assertTrue(hook.NARROWING.search(cmd), cmd)
+
+    def test_wrapper_arguments_in_quotes_do_not_count(self):
+        for cmd in ["git commit -m 'sort the list'", "git commit -m \"fix: sort list\"", "ssh host 'echo grep'",
+                    "docker ps", "sudo make install"]:
+            self.assertFalse(hook.NARROWING.search(cmd), cmd)
+
 
 class I29_OversizedSavedOutputSaysItWasCut(unittest.TestCase):
     def test_summary_notes_that_only_part_of_the_file_was_read(self):
@@ -838,6 +850,71 @@ class I39_OpenerCheckUsesWholeWords(unittest.TestCase):
         for first in ["Sure, here it is.", "Great question!", "Great, let's begin.", "Hello! Here it is.", "Certainly.",
                       "Absolutely, do this.", "Good question."]:
             self.assertFalse(self.opens_with_answer(first), first)
+
+
+# ====================================================================== found in the PR review
+
+def lstat_foreign(owned_by_other):
+    """os.lstat, but the folder `owned_by_other` looks as if another user owns it."""
+    real = os.lstat
+
+    def fake(path, *a, **kw):
+        st = real(path, *a, **kw)
+        if os.path.abspath(path) == os.path.abspath(owned_by_other):
+            fields = list(st)
+            fields[stat.ST_UID] = os.getuid() + 1
+            return os.stat_result(fields)
+        return st
+    return fake
+
+
+@unittest.skipUnless(hasattr(os, "getuid"), "folder owners are checked on POSIX only")
+class R_PrivateTempDirIsReused(unittest.TestCase):
+    def check(self, module):
+        tmp = support.tmp("regressions", "r-private-" + module.__name__, "x")[:-2]
+        os.makedirs(os.path.join(tmp, "cache"), exist_ok=True)
+        with mock.patch("tempfile.gettempdir", return_value=tmp), \
+                mock.patch.object(os, "lstat", lstat_foreign(os.path.join(tmp, "cache"))):
+            first, second = module._private_temp_dir("cache"), module._private_temp_dir("cache")
+        self.assertEqual(first, second)
+        self.assertNotEqual(first, os.path.join(tmp, "cache"))
+        self.assertEqual(stat.S_IMODE(os.stat(first).st_mode), 0o700)
+
+    def test_squeeze_reuses_its_fallback_folder(self):
+        self.check(squeeze)
+
+    def test_ithildin_reuses_its_fallback_folder(self):
+        self.check(ithildin)
+
+    def test_a_file_in_the_way_is_not_fatal(self):
+        tmp = support.tmp("regressions", "r-private-file", "x")[:-2]
+        support.write(os.path.join(tmp, "cache"), "not a folder")
+        with mock.patch("tempfile.gettempdir", return_value=tmp):
+            self.assertTrue(os.path.isdir(squeeze._private_temp_dir("cache")))
+
+
+class R_SqueezePassesThroughWhenTheCacheFolderFails(unittest.TestCase):
+    def test_no_cache_folder_means_the_input_passes_through(self):
+        with mock.patch.dict(os.environ), mock.patch.object(squeeze, "_private_temp_dir", side_effect=PermissionError("no")):
+            os.environ.pop("LEMBAS_SQUEEZE_DIR", None)
+            view, info = squeeze.squeeze(log_text(), kind="log")
+        self.assertIsNone(view)
+        self.assertIn("could not save the original", info["error"])
+
+
+class R_FailedPdfOpenIsRemembered(unittest.TestCase):
+    def test_a_pdf_pypdf_cannot_open_is_parsed_once(self):
+        with mock.patch.object(ithildin, "_pdf_reader", side_effect=ValueError("damaged")) as opener:
+            get = ithildin._reader_once("x.pdf")
+            for _ in range(3):
+                with self.assertRaises(ValueError):
+                    get()
+        self.assertEqual(opener.call_count, 1)
+
+
+class R_CutNoteSurvivesAVanishedFile(unittest.TestCase):
+    def test_a_missing_file_gives_no_note(self):
+        self.assertEqual(hook._cut_note(support.tmp("regressions", "gone.log")), "")
 
 
 if __name__ == "__main__":

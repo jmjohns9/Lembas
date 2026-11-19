@@ -817,19 +817,26 @@ def _private_temp_dir(name):
     """A folder for `name` under the system temp folder that only the current user can read.
 
     The temp folder is shared, so another user could have made a folder of that name first and would
-    then be able to read everything written into it. Such a folder is not used: a new private one is."""
+    then be able to read everything written into it. Such a folder is not used: `name-<uid>` is tried
+    next, so later runs find the same folder, and a new private one is made only if that fails too."""
     import tempfile
-    d = os.path.join(tempfile.gettempdir(), name)
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    if hasattr(os, "getuid"):
-        st = os.lstat(d)
-        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
-            return tempfile.mkdtemp(prefix=name + "-")
-    try:
-        os.chmod(d, 0o700)
-    except OSError:
-        pass
-    return d
+    names = [name] + ([f"{name}-{os.getuid()}"] if hasattr(os, "getuid") else [])
+    for n in names:
+        d = os.path.join(tempfile.gettempdir(), n)
+        try:
+            os.makedirs(d, mode=0o700, exist_ok=True)
+        except OSError:   # a file of that name is in the way
+            continue
+        if hasattr(os, "getuid"):
+            st = os.lstat(d)
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                continue
+        try:
+            os.chmod(d, 0o700)
+        except OSError:
+            pass
+        return d
+    return tempfile.mkdtemp(prefix=name + "-")
 
 
 def _cache_path(text, kind, cache_dir=None):
@@ -842,7 +849,7 @@ def _cache_path(text, kind, cache_dir=None):
 
 
 def _store(text, path):
-    """Write `text` to `path` unless it is already there. Returns the path used."""
+    """Write `text` to `path` unless it is already there. Returns the path."""
     # Command output can contain secrets, so the cache is readable by the current user only.
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     if not os.path.exists(path):
@@ -914,21 +921,22 @@ def squeeze(text, name=None, kind="auto", budget=DEFAULT_BUDGET, threshold=DEFAU
 
     # Decide whether the summary is worth using before anything is written: output that is passed
     # through needs no saved copy, and command output can hold secrets.
-    path = original_path or _cache_path(text, kind)
+    # A summary must point at the full text. With nowhere to keep it, pass the input through.
+    try:
+        path = original_path or _cache_path(text, kind)
+    except OSError as exc:
+        info["error"] = f"could not save the original: {exc!r}"
+        return None, info
     view = with_header(path)
     info.update(kind=kind, after=est_tokens(view))
     if info["after"] > before * (1 - MIN_SAVING):
         return None, info
     if not original_path:
         try:
-            saved = _store(text, path)
+            _store(text, path)
         except OSError as exc:
-            # A summary must point at the full text. With nowhere to keep it, pass the input through.
             info["error"] = f"could not save the original: {exc!r}"
             return None, info
-        if saved != path:
-            path, view = saved, with_header(saved)
-            info["after"] = est_tokens(view)
     info["path"] = path
     return view, info
 

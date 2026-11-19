@@ -39,9 +39,12 @@ INLINE_LIMIT = 30000             # Claude Code shows Bash output up to about thi
 # The name has to be in command position: at the start, after a pipe or another separator, or behind
 # a wrapper such as sudo. A file called more.log or a flag value like `-k tail` is not a query.
 NARROWING = re.compile(
-    r"(?:^|[|;&(`\n]|\b(?:do|then|else)\s|-exec(?:dir)?\s)\s*"                  # where a command can start
+    r"(?:^|[|;&(`{!\n]|\b(?:do|then|else|if|while|until)\s|-exec(?:dir)?\s)\s*"  # where a command can start
     r"(?:[A-Za-z_]\w*=\S*\s+)*"                                                  # VAR=value prefixes
-    r"(?:(?:sudo|time|command|nice|env|exec|nohup|git)\s+(?:-\S+\s+)*)*"         # wrappers, and `git grep`
+    # Wrappers that run another command, with their unquoted arguments (`sudo -u app`, `ssh host`,
+    # `git -C repo grep`), and a `-c "..."` script. Other quoted text is an argument, not a command.
+    r"(?:(?:sudo|time|timeout|command|nice|env|exec|nohup|watch|git|ssh|docker|kubectl|bash|sh|zsh)"
+    r"(?:\s+[^\s|;&'\"`]+)*?\s+(?:-c\s+[\"'])?)*"
     r"(?:[\w./-]*/)?"                                                            # /usr/bin/
     r"(?:grep|egrep|fgrep|rg|ag|head|tail|sed|awk|cut|jq|yq|sort|uniq|wc|tr|column|less|more|xargs)"
     r"(?![\w.-])"
@@ -78,7 +81,10 @@ def read_text(path, limit=None):
 
 def _cut_note(path):
     """A line to add to a summary when the file is larger than the part that was read, else ''."""
-    if os.path.getsize(path) <= MAX_SCAN:
+    try:
+        if os.path.getsize(path) <= MAX_SCAN:
+            return ""
+    except OSError:   # the file went away after it was read; the summary is still good
         return ""
     size = f"{MAX_SCAN // 1_048_576} MB" if MAX_SCAN >= 1_048_576 else f"{MAX_SCAN // 1024} KB"
     return f"\n[only the first {size} of {path} was read for this summary; search the file itself for anything later]"
