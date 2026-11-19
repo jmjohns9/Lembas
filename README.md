@@ -58,7 +58,7 @@ cp -r lembas/skills/ithildin ~/.claude/skills/    # optional: long documents
 
 Start a session and type `/lembas` or "lembas mode". It stays on until you say "stop lembas" or "normal mode". Ithildin triggers on its own when you ask about a long document, or with `/ithildin`.
 
-**Claude apps (claude.ai, desktop):** build the skill files, then open each in Claude and click **Save skill**:
+**Claude apps (claude.ai, desktop):** download `lembas.skill` and `ithildin.skill` from the [latest release](https://github.com/jmjohns9/lembas/releases/latest), then open each in Claude and click **Save skill**. To build them yourself instead:
 
 ```bash
 git clone https://github.com/jmjohns9/lembas.git

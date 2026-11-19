@@ -2,6 +2,36 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
+## [2.2.0] - 2026-11-18
+
+A full review of the code: bug fixes, tests and faster `find` and squeeze. The findings are in [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md).
+
+### Changed
+- **Ithildin:** an unsupported binary file or an out-of-range `read` target now exits with a message instead of printing garbage. `--depth` counts from the document's top heading level. `table` on a figure explains that figures have no rows.
+- **Squeeze:** when the original can't be saved, the input passes through unchanged. A file that can't be read exits with status 2 instead of a traceback.
+- **Squeeze hook:** a command counts as narrowing only in command position, so a file called `more.log` or a flag value like `-k tail` no longer stops a squeeze. Bad `LEMBAS_SQUEEZE_*` values are reported and the default used.
+
+### Fixed
+- Piped output lost when the cache folder can't be written or the terminal isn't UTF-8.
+- The hook summarising a partial Read as if it were the whole file.
+- Wrong slide numbers in reordered decks, and Word text inside content controls skipped.
+- Cache files readable by other users; they are now private to the current user.
+- `grade.py` passing when a reply was missing or empty.
+
+### Performance
+Output is byte-identical before and after.
+- `find` with 12,000 hits: 2,555 ms to 371 ms.
+- Squeezing 100k JSON objects: 1,005 ms to 673 ms; a 200k-row CSV: 1,079 ms to 769 ms.
+- The hook on a small result, which runs on every tool call: 28.8 ms to 19.9 ms.
+
+### Added
+- Tests: 43 to 484, line coverage 83% to 98%. CI runs `ruff`, the full suite and a run with no extra packages on Python 3.10 and 3.13.
+- [docs/HOW_LEMBAS_WORKS.md](docs/HOW_LEMBAS_WORKS.md): how tokens work and a walk through the code.
+- The `.skill` files are attached to each release.
+
+### Known issues
+- Removing running headers can delete numbered chapter headings in PDFs without bookmarks (I-43).
+
 ## [2.1.0] - 2026-10-16
 
 Adds Ithildin, a second skill for long documents.
@@ -106,6 +136,7 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
+[2.2.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.0
 [2.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.1.0
 [2.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.0.0
 [1.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v1.1.0
