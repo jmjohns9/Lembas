@@ -2,7 +2,7 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
-## [Unreleased]
+## [2.2.1] - 2026-11-18
 
 ### Fixed
 - **Ithildin:** numbered chapter headings that open many pages of a PDF without bookmarks are no longer removed as running headers, unless every chapter is one page long and numbered like the pages (I-43).
@@ -141,6 +141,7 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
+[2.2.1]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.1
 [2.2.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.0
 [2.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.1.0
 [2.0.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.0.0
