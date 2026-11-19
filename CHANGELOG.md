@@ -2,7 +2,7 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
-## [Unreleased]
+## [2.2.2] - 2026-11-18
 
 ### Fixed
 - **Eval runners:** `generate_replies.py`, both `run_e2e.py` benchmarks and `live_usage.py` close every file they open, so runs no longer print `ResourceWarning`s.
@@ -147,6 +147,7 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
+[2.2.2]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.2
 [2.2.1]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.1
 [2.2.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.0
 [2.1.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.1.0
