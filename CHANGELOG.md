@@ -2,6 +2,11 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
+## [Unreleased]
+
+### Fixed
+- **Ithildin:** numbered chapter headings that open many pages of a PDF without bookmarks are no longer removed as running headers, unless every chapter is one page long and numbered like the pages (I-43).
+
 ## [2.2.0] - 2026-11-18
 
 A full review of the code: bug fixes, tests and faster `find` and squeeze. The findings are in [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md).

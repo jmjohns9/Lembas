@@ -222,7 +222,7 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests
 ```
 
-Expected: `Ran 476 tests` and `OK (expected failures=1)`. The one expected failure is a known open bug, [I-43](docs/CODE_REVIEW.md#i-43). Without the extra packages, `python3 -m unittest discover -s tests` still runs and skips the tests that need them.
+Expected: `Ran 488 tests` and `OK (expected failures=1)`. The one expected failure is the case [I-43](docs/CODE_REVIEW.md#i-43) leaves open: one chapter per page, numbered like the pages. Without the extra packages, `python3 -m unittest discover -s tests` still runs and skips the tests that need them.
 
 Coverage and lint:
 

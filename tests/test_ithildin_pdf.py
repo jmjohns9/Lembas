@@ -167,7 +167,7 @@ def build_pdf(path, bookmarks):
     """Four chapters with one subsection each, one captioned table and one figure caption.
 
     Chapters flow on from one another, so headings fall wherever the text puts them. A heading
-    that opens every page looks like a running header to ithildin and is removed (review I-43).
+    that opens every page, numbered like the pages, looks like a running header and is removed (review I-43).
     """
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
