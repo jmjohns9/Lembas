@@ -666,7 +666,7 @@ class I37_FileNamesCannotBeMistakenForOptions(unittest.TestCase):
             self.assertEqual(run.call_args[0][0][3], os.path.abspath("-opw.pdf"))
             run.return_value = types.SimpleNamespace(returncode=0, stdout="# T\n\nBody.\n", stderr="")
             ithildin.extract_with_pandoc("-o.rst")
-            self.assertEqual(run.call_args[0][0][1], os.path.abspath("-o.rst"))
+            self.assertEqual(run.call_args[0][0][2], os.path.abspath("-o.rst"))
 
 
 class I43_NumberedHeadingsThatOpenEveryPage(unittest.TestCase):

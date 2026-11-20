@@ -30,12 +30,19 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from xml.etree import ElementTree as ET
 
 VERSION = "1.0.0"   # this script's own version, printed by --version; not the Lembas release number
 DEFAULT_MAP_BUDGET = 2500
 DEFAULT_READ_TOKENS = 8000
+DEFAULT_CACHE_HOURS = 24         # how long a parsed document is cached; ITHILDIN_CACHE_HOURS, 0 = no cache
+CACHE_NAME = re.compile(r"[0-9a-f]{40}\.json")   # the names load() gives cache entries
+# A Word or PowerPoint file is a zip. These limits stop a small file that unpacks to gigabytes (a zip
+# bomb) from exhausting memory; real documents stay far below them.
+MAX_ZIP_MEMBER = 100 * 1024 * 1024    # one XML part
+MAX_ZIP_TOTAL = 500 * 1024 * 1024     # all the parts read from one file
 GIST_WORDS = 28
 
 
@@ -351,13 +358,30 @@ def _docx_children(parent, tags):
             yield from _docx_children(child, tags)
 
 
+class TooLarge(ValueError):
+    """A part of a Word or PowerPoint file unpacks to more than the limits allow."""
+
+
+def _zip_read(z, name):
+    """z.read(name), refused when the part, or all parts read so far, would unpack past the limits.
+    zipfile stops at the size a part declares, so checking the declared size bounds the memory used."""
+    size = z.getinfo(name).file_size
+    total = getattr(z, "_ithildin_read", 0) + size
+    if size > MAX_ZIP_MEMBER:
+        raise TooLarge(f"{name} unpacks to {size:,} bytes, over the {MAX_ZIP_MEMBER:,}-byte limit for one part")
+    if total > MAX_ZIP_TOTAL:
+        raise TooLarge(f"{name} unpacks to {size:,} bytes, taking the file over the {MAX_ZIP_TOTAL:,}-byte limit")
+    z._ithildin_read = total
+    return z.read(name)
+
+
 def extract_docx(path):
     doc = Doc(path, "Word document")
     with zipfile.ZipFile(path) as z:
-        body = ET.fromstring(z.read("word/document.xml")).find(W + "body")
+        body = ET.fromstring(_zip_read(z, "word/document.xml")).find(W + "body")
         styles = {}
         if "word/styles.xml" in z.namelist():
-            for st in ET.fromstring(z.read("word/styles.xml")).iter(W + "style"):
+            for st in ET.fromstring(_zip_read(z, "word/styles.xml")).iter(W + "style"):
                 sid = st.get(W + "styleId")
                 name = st.find(W + "name")
                 lvl = st.find(f"{W}pPr/{W}outlineLvl")
@@ -429,8 +453,8 @@ def _slide_order(z, names):
     """
     by_number = sorted(names, key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[1]).group(1)))
     try:
-        rels = ET.fromstring(z.read("ppt/_rels/presentation.xml.rels"))
-        listed = ET.fromstring(z.read("ppt/presentation.xml")).iter(PML + "sldId")
+        rels = ET.fromstring(_zip_read(z, "ppt/_rels/presentation.xml.rels"))
+        listed = ET.fromstring(_zip_read(z, "ppt/presentation.xml")).iter(PML + "sldId")
     except (KeyError, ET.ParseError):
         return by_number
     targets = {r.get("Id"): r.get("Target") or "" for r in rels}
@@ -448,7 +472,7 @@ def extract_pptx(path):
     with zipfile.ZipFile(path) as z:
         names = _slide_order(z, [n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)])
         for i, name in enumerate(names, 1):
-            root = ET.fromstring(z.read(name))
+            root = ET.fromstring(_zip_read(z, name))
             title_done = False
             for sp in root.iter("{http://schemas.openxmlformats.org/presentationml/2006/main}sp"):
                 is_title = any(ph.get("type") in ("title", "ctrTitle")
@@ -572,7 +596,12 @@ def extract_html(path):
 
 
 def extract_with_pandoc(path):
-    r = _run(["pandoc", os.path.abspath(path), "-t", "gfm", "--wrap=none"])
+    # --sandbox stops pandoc following include directives (.. include::, \input, #+INCLUDE) and fetching
+    # images, so a document cannot pull other files from this computer into what Claude reads.
+    r = _run(["pandoc", "--sandbox", os.path.abspath(path), "-t", "gfm", "--wrap=none"])
+    if r.returncode != 0 and "sandbox" in r.stderr.lower():
+        sys.exit("ithildin: the installed pandoc is too old to read files safely: it has no --sandbox option, "
+                 "added in pandoc 2.15. Upgrade pandoc, or convert the file to PDF, DOCX or Markdown.")
     if r.returncode != 0:
         sys.exit(f"ithildin: pandoc could not read {path}: {r.stderr.strip()[:300]}")
     return extract_markdown(path, r.stdout, os.path.splitext(path)[1].lstrip(".").upper() + " document")
@@ -761,6 +790,41 @@ def cache_dir():
     return _private_temp_dir("ithildin")
 
 
+def cache_hours():
+    """How many hours a parsed document stays cached (ITHILDIN_CACHE_HOURS). 0 turns the cache off."""
+    raw = os.environ.get("ITHILDIN_CACHE_HOURS", "").strip()
+    if not raw:
+        return DEFAULT_CACHE_HOURS
+    try:
+        hours = float(raw)
+        if hours >= 0:
+            return hours
+    except ValueError:
+        pass
+    print(f"ithildin: ITHILDIN_CACHE_HOURS={raw!r} is not a number of hours; using {DEFAULT_CACHE_HOURS}", file=sys.stderr)
+    return DEFAULT_CACHE_HOURS
+
+
+def _prune(folder, hours):
+    """Delete cache entries in `folder` older than `hours`. Only files with the names load() gives are
+    touched, so an ITHILDIN_CACHE folder shared with other files is safe."""
+    cutoff = time.time() - hours * 3600
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if not CACHE_NAME.fullmatch(name):
+            continue
+        p = os.path.join(folder, name)
+        try:
+            st = os.lstat(p)
+            if stat.S_ISREG(st.st_mode) and st.st_mtime < cutoff:
+                os.remove(p)
+        except OSError:
+            pass
+
+
 PANDOC_EXTS = (".rst", ".odt", ".epub", ".rtf", ".org", ".tex", ".adoc", ".textile")
 
 
@@ -774,6 +838,9 @@ def _office(extract, path, kind):
     """Read a Word or PowerPoint file, or exit with a message if it is not really one."""
     try:
         return extract(path)
+    except TooLarge as exc:
+        sys.exit(f"ithildin: {os.path.basename(path)} was not read: {exc}. A real {kind} file is far smaller; "
+                 "this one may be built to exhaust memory.")
     except (zipfile.BadZipFile, KeyError, ET.ParseError, ValueError, TypeError, AttributeError) as exc:
         sys.exit(f"ithildin: {os.path.basename(path)} is not a valid {kind} file ({exc.__class__.__name__}: {exc}).")
 
@@ -788,8 +855,13 @@ def load(path):
     with open(os.path.abspath(__file__), "rb") as f:
         h.update(f.read())   # a new script version never reuses an old cache entry
     h.update(os.path.splitext(path)[1].lower().encode())   # the extension picks the parser
-    cpath = os.path.join(cache_dir(), h.hexdigest() + ".json")
-    if os.path.exists(cpath):
+    hours = cache_hours()
+    cpath = None
+    if hours > 0:
+        folder = cache_dir()
+        _prune(folder, hours)
+        cpath = os.path.join(folder, h.hexdigest() + ".json")
+    if cpath and os.path.exists(cpath):
         try:
             with open(cpath) as f:
                 d = json.load(f)
@@ -831,6 +903,8 @@ def load(path):
     else:
         doc = extract_text(path)        # an unknown extension or none: plain text, or markup read as text
     finish(doc)
+    if not cpath:
+        return doc
     try:
         with os.fdopen(os.open(cpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             json.dump({k: v for k, v in doc.__dict__.items() if k != "path"}, f)

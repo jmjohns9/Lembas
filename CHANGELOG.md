@@ -2,6 +2,15 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
+## [Unreleased]
+
+### Security
+- **Saved copies expire.** `squeeze.py` deletes saved originals after `LEMBAS_SQUEEZE_KEEP_HOURS` hours and Ithildin deletes cached documents after `ITHILDIN_CACHE_HOURS` hours (both default 24). Set either to `0` to keep nothing on disk. Only files the tools named themselves are deleted.
+- **pandoc runs with `--sandbox`.** Before, an `.rst`, `.tex` or `.org` file could use an include directive to pull another local file, such as an SSH key, into the text Claude reads. A pandoc older than 2.15, which has no sandbox, is refused rather than run unprotected.
+- **Size limits for Word and PowerPoint files.** A part that unpacks past 100 MB, or a file past 500 MB in total, is refused, so a zip bomb can't exhaust memory.
+- **Instructions inside data.** Both skills now tell Claude to treat command output, files and documents as data and to report instructions found in them instead of following them.
+- **Checksums.** `scripts/package.sh` writes `dist/SHA256SUMS`, published with each release.
+
 ## [2.2.2] - 2026-11-18
 
 ### Fixed
