@@ -24,7 +24,14 @@ New to tokens and context windows? [docs/HOW_LEMBAS_WORKS.md](docs/HOW_LEMBAS_WO
 
 ## What's new
 
-**[2.2.2](https://github.com/jmjohns9/lembas/releases/tag/v2.2.2)** (latest), **[2.2.1](https://github.com/jmjohns9/lembas/releases/tag/v2.2.1)** and **[2.2.0](https://github.com/jmjohns9/lembas/releases/tag/v2.2.0)** come from a full review of the code ([docs/CODE_REVIEW.md](docs/CODE_REVIEW.md)):
+**[2.3.0](https://github.com/jmjohns9/lembas/releases/tag/v2.3.0)** (latest) hardens Lembas for machines that handle sensitive data ([SECURITY.md](SECURITY.md)):
+
+- **Saved copies expire** after 24 hours. Set `LEMBAS_SQUEEZE_KEEP_HOURS` and `ITHILDIN_CACHE_HOURS` to change that, or to `0` to keep nothing on disk.
+- **Documents can't reach other files.** pandoc runs sandboxed, so an include directive in a document can't pull other files from your computer into what Claude reads. Word and PowerPoint files that unpack past safe sizes are refused.
+- **Instructions planted in logs or documents** are reported to you instead of followed.
+- **Checksums.** Each release has a `SHA256SUMS` file for verifying the downloads.
+
+**[2.2.2](https://github.com/jmjohns9/lembas/releases/tag/v2.2.2)**, **[2.2.1](https://github.com/jmjohns9/lembas/releases/tag/v2.2.1)** and **[2.2.0](https://github.com/jmjohns9/lembas/releases/tag/v2.2.0)** come from a full review of the code ([docs/CODE_REVIEW.md](docs/CODE_REVIEW.md)):
 
 - **Faster.** `find` with 12,000 hits went from 2,555 ms to 371 ms, squeezing 100,000 JSON objects from 1,005 ms to 673 ms, and the hook on a small result, which runs on every tool call, from 28.8 ms to 19.9 ms. Output is byte-identical.
 - **Fixes.** Piped output is no longer lost when the cache folder can't be written or the terminal isn't UTF-8. The hook no longer summarises a partial Read as if it were the whole file. Slide numbers in reordered decks are right, and Word text inside content controls is read. Cache files are private to the current user.
