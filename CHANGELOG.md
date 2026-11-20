@@ -2,7 +2,7 @@
 
 All notable changes to Lembas are listed here. Versions follow [Semantic Versioning](https://semver.org). Reduction figures are the average token cut against the same prompts answered without Lembas.
 
-## [Unreleased]
+## [2.3.0] - 2026-11-19
 
 ### Security
 - **Saved copies expire.** `squeeze.py` deletes saved originals after `LEMBAS_SQUEEZE_KEEP_HOURS` hours and Ithildin deletes cached documents after `ITHILDIN_CACHE_HOURS` hours (both default 24). Set either to `0` to keep nothing on disk. Only files the tools named themselves are deleted.
@@ -156,6 +156,7 @@ Average reduction 58.1% on 5 prompts.
 ### Added
 - First draft: answer first, cut ceremony, shortest complete answer, prose over formatting, plain language, exact payload, keep negations, writing-task exemption, relax rules and a pre-send check.
 
+[2.3.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.3.0
 [2.2.2]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.2
 [2.2.1]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.1
 [2.2.0]: https://github.com/jmjohns9/lembas/releases/tag/v2.2.0
